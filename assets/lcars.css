@@ -1,0 +1,43 @@
+* { font-family: "DejaVu Sans", sans-serif; font-size: 14px; }
+window { background: #07090d; color: #e2dce9; }
+.masthead { background: #080a0e; padding: 16px 22px 12px; border-bottom: 12px solid #eab187; }
+.brand { color: #eab187; font-size: 34px; font-weight: 900; letter-spacing: 3px; }
+.masthead-sub { color: #b6a6ce; font-size: 10px; letter-spacing: 2px; }
+.rail { background: #07090d; padding: 0 8px 12px 16px; border-right: 10px solid #eab187; border-top-right-radius: 44px; }
+.rail-cap { background: #eab187; color: #101019; padding: 28px 14px; border-bottom-left-radius: 48px; font-size: 20px; font-weight: 900; }
+.rail-footer { color: #9b8ab4; font-size: 12px; padding: 20px 12px; }
+button { background: #b0a0d1; color: #0b0b12; border: none; border-radius: 24px; padding: 9px 18px; font-weight: 800; box-shadow: none; }
+button:hover { background: #e9cfb8; }
+button:active { background: #fff0dc; }
+button:focus-visible, entry:focus { outline: 3px solid #f5e7c7; outline-offset: 2px; }
+button:disabled { opacity: 0.38; }
+.nav { border-radius: 24px 0 0 24px; background: #aa91c4; font-size: 11px; padding: 12px 10px; }
+.nav.selected { background: #f1b984; }
+.nav:nth-child(3) { background: #c1a9d9; }
+.primary { background: #edb285; }
+.secondary { background: #ad9dce; }
+.danger { background: #da9298; }
+.compact { min-height: 24px; font-size: 10px; padding: 4px 14px; background: #202331; color: #dbd1e8; }
+.page-title { color: #eeb78c; font-size: 22px; font-weight: 800; letter-spacing: 2px; }
+.muted { color: #9f9bb0; font-size: 12px; }
+.hero { font-size: 38px; font-weight: 900; color: #c8b8e6; letter-spacing: 1px; }
+.system-id { background: #202230; border-left: 8px solid #b79ed3; padding: 18px; color: #c7b3df; font-size: 13px; }
+.card { background: #141620; border-radius: 6px 28px 6px 6px; border-top: 5px solid #ad96c7; padding: 18px; }
+.eyebrow { color: #b9a4d4; font-size: 11px; font-weight: 800; letter-spacing: 1px; }
+.metric { color: #f2c29a; font-size: 28px; font-weight: 800; }
+progressbar trough { background: #292b3b; border: none; min-height: 8px; border-radius: 4px; }
+progressbar progress { background: #eab187; border: none; min-height: 8px; border-radius: 4px; }
+.strip { color: #d4c1e3; background: #181a25; border-left: 7px solid #eab187; padding: 16px; font-size: 13px; }
+.footer { padding: 12px 22px; background: #151720; border-top: 5px solid #b199cb; }
+.status { color: #b2cfbf; font-weight: 800; font-size: 12px; }
+.warning { color: #ff9797; }
+entry, searchentry { background: #1b1e2a; color: #e4dcee; border: 1px solid #454158; border-radius: 8px; padding: 10px; }
+.directory { background: #10121a; border-radius: 8px; }
+.directory row { border-bottom: 1px solid #242532; }
+.directory row:selected { background: #3c344d; }
+.file-row { padding: 8px 12px; color: #d4c2e6; }
+.app-tile { background: #171925; color: #d2bcdf; border-radius: 3px; padding: 12px; }
+.app-tile:hover { background: #363044; }
+textview, textview text { background: #10121a; color: #c7c2d4; font-family: monospace; font-size: 12px; }
+checkbutton { color: #e0d5eb; padding: 10px; }
+dialog { background: #161923; }
