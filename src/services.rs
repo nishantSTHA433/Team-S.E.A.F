@@ -27,7 +27,7 @@ pub struct Preferences {
 impl Default for Preferences {
     fn default() -> Self {
         Self {
-            sound: false,
+            sound: true,
             reduced_motion: true,
         }
     }
@@ -257,5 +257,59 @@ mod tests {
         assert_eq!(cpu_ticks("cpu 10 0 10 70 10 0 0 0 5 0"), Some((100, 80)));
         assert_eq!(cpu_percent((100, 80), (200, 150)), 30.0);
         assert_eq!(cpu_percent((200, 150), (100, 80)), 0.0);
+    }
+}
+
+pub fn drive_labels(ids: &[String]) -> Result<Vec<String>, String> {
+    let path = config_path().with_file_name("drive-labels.json");
+    let mut map: std::collections::BTreeMap<String, String> = match fs::read(&path) {
+        Ok(bytes) => serde_json::from_slice(&bytes).map_err(|e| format!("Drive mappings: {e}"))?,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Default::default(),
+        Err(e) => return Err(e.to_string()),
+    };
+    let result = assign_drive_labels(&mut map, ids);
+    fs::create_dir_all(path.parent().ok_or("No config directory")?).map_err(|e| e.to_string())?;
+    let temp = path.with_extension("tmp");
+    fs::write(
+        &temp,
+        serde_json::to_vec_pretty(&map).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())?;
+    fs::rename(temp, path).map_err(|e| e.to_string())?;
+    Ok(result)
+}
+fn assign_drive_labels(
+    map: &mut std::collections::BTreeMap<String, String>,
+    ids: &[String],
+) -> Vec<String> {
+    ids.iter()
+        .map(|id| {
+            if let Some(label) = map.get(id) {
+                return label.clone();
+            }
+            let name = (b'D'..=b'Z')
+                .map(|c| format!("{}:", c as char))
+                .find(|s| !map.values().any(|v| v == s))
+                .unwrap_or_else(|| format!("VOL-{}", map.len() + 1));
+            map.insert(id.clone(), name.clone());
+            name
+        })
+        .collect()
+}
+#[cfg(test)]
+mod drive_tests {
+    use super::*;
+    #[test]
+    fn drive_labels_survive_reordering_and_unplugging() {
+        let mut map = std::collections::BTreeMap::new();
+        assert_eq!(
+            assign_drive_labels(&mut map, &["disk-a".into(), "disk-b".into()]),
+            ["D:", "E:"]
+        );
+        assert_eq!(
+            assign_drive_labels(&mut map, &["disk-b".into(), "disk-c".into()]),
+            ["E:", "F:"]
+        );
+        assert_eq!(assign_drive_labels(&mut map, &["disk-a".into()]), ["D:"]);
     }
 }

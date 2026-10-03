@@ -28,9 +28,9 @@ fn button(text: &str, class: &str) -> gtk::Button {
 }
 
 fn page(title: &str, subtitle: &str) -> gtk::Box {
-    let p = column(18);
-    p.set_margin_top(20);
-    p.set_margin_bottom(20);
+    let p = column(10);
+    p.set_margin_top(10);
+    p.set_margin_bottom(10);
     p.set_margin_start(24);
     p.set_margin_end(24);
     p.append(&label(title, "page-title"));
@@ -70,6 +70,7 @@ pub fn build(app: &gtk::Application) {
     let window = gtk::ApplicationWindow::builder()
         .application(app)
         .title("LCARS • Fedora Operations")
+        .decorated(false)
         .default_width(1080)
         .default_height(700)
         .build();
@@ -77,7 +78,7 @@ pub fn build(app: &gtk::Application) {
     let root = column(0);
     let header = row(12);
     header.add_css_class("masthead");
-    let brand = label("LCARS", "brand");
+    let brand = label("LCARS 40282", "brand");
     header.append(&brand);
     let sub = label("LIBRARY COMPUTER ACCESS / RETRIEVAL SYSTEM", "masthead-sub");
     sub.set_hexpand(true);
@@ -102,13 +103,13 @@ pub fn build(app: &gtk::Application) {
         }
     });
     header.append(&quit);
-    root.append(&header);
+    root.append(&gtk::WindowHandle::builder().child(&header).build());
     let body = row(0);
     body.set_vexpand(true);
-    let rail = column(8);
+    let rail = column(3);
     rail.add_css_class("rail");
-    rail.set_width_request(176);
-    rail.append(&label("01–47\nOPERATIONS", "rail-cap"));
+    rail.set_width_request(154);
+    rail.append(&label("47\nCOMMAND", "rail-cap"));
     let stack = gtk::Stack::new();
     stack.set_hexpand(true);
     stack.set_vexpand(true);
@@ -120,8 +121,45 @@ pub fn build(app: &gtk::Application) {
     let hero = row(12);
     let hero_text = column(8);
     hero_text.set_hexpand(true);
-    hero_text.append(&label("COMPUTER\nOPERATIONS", "hero"));
-    hero_text.append(&label("Your Fedora workstation, at a glance.", "muted"));
+    hero_text.append(&label("SYSTEM AVAILABLE", "hero"));
+    hero_text.append(&label("STATION ID 1440–900  /  OPERATIONS ONLINE", "muted"));
+    let emblem = gtk::DrawingArea::new();
+    emblem.set_content_width(140);
+    emblem.set_content_height(140);
+    emblem.set_draw_func(|_, cr, w, h| {
+        let cx = w as f64 / 2.0;
+        let cy = h as f64 / 2.0;
+        cr.set_source_rgb(0.03, 0.03, 0.15);
+        cr.arc(cx, cy, 52.0, 0.0, std::f64::consts::TAU);
+        let _ = cr.fill();
+        cr.set_source_rgb(0.67, 0.63, 0.82);
+        cr.set_line_width(2.0);
+        cr.arc(cx, cy, 54.0, 0.0, std::f64::consts::TAU);
+        let _ = cr.stroke();
+        for i in 0..36 {
+            let angle = i as f64 * 2.39996;
+            let radius = 8.0 + (i as f64 * 7.0) % 43.0;
+            cr.arc(
+                cx + angle.cos() * radius,
+                cy + angle.sin() * radius,
+                if i % 5 == 0 { 1.6 } else { 0.7 },
+                0.0,
+                std::f64::consts::TAU,
+            );
+            let _ = cr.fill();
+        }
+        cr.move_to(cx, cy - 22.0);
+        cr.line_to(cx + 5.0, cy - 4.0);
+        cr.line_to(cx + 22.0, cy);
+        cr.line_to(cx + 5.0, cy + 4.0);
+        cr.line_to(cx, cy + 22.0);
+        cr.line_to(cx - 5.0, cy + 4.0);
+        cr.line_to(cx - 22.0, cy);
+        cr.line_to(cx - 5.0, cy - 4.0);
+        cr.close_path();
+        let _ = cr.fill();
+    });
+    hero.append(&emblem);
     hero.append(&hero_text);
     let system_id = label("LCARS\n01 / 2026\nFEDORA NODE", "system-id");
     hero.append(&system_id);
@@ -148,13 +186,15 @@ pub fn build(app: &gtk::Application) {
     let (network_page, network_status) = network_page();
     stack.add_named(&scrolled(&network_page), Some("network"));
     stack.add_named(&scrolled(&applications_page()), Some("apps"));
+    stack.add_named(&scrolled(&crate::tools::page()), Some("tools"));
     stack.add_named(&scrolled(&settings_page(&preferences)), Some("settings"));
     let nav_items = [
         ("01  OVERVIEW", "dashboard"),
         ("02  FILES", "files"),
         ("03  NETWORK", "network"),
         ("04  APPLICATIONS", "apps"),
-        ("05  PREFERENCES", "settings"),
+        ("05  UTILITIES", "tools"),
+        ("06  PREFERENCES", "settings"),
     ];
     let nav_buttons: Rc<RefCell<Vec<gtk::Button>>> = Rc::new(RefCell::new(Vec::new()));
     for (text, name) in nav_items {
@@ -178,7 +218,7 @@ pub fn build(app: &gtk::Application) {
     spacer.set_vexpand(true);
     rail.append(&spacer);
     rail.append(&label(
-        "LOCAL SYSTEM\nFEDORA 38\nPROTOTYPE 0.1",
+        "LOCAL SYSTEM\nFEDORA 38\nCONSOLE 0.2",
         "rail-footer",
     ));
     body.append(&rail);
@@ -189,10 +229,107 @@ pub fn build(app: &gtk::Application) {
     let indicator = label("● CHECKING NETWORK", "status");
     indicator.set_hexpand(true);
     let clock = label("", "muted");
+    for (title, target) in [
+        ("LCARS", "dashboard"),
+        ("FILES", "files"),
+        ("NETWORK", "network"),
+        ("TOOLS", "tools"),
+    ] {
+        let shortcut = button(title, "dock-button");
+        shortcut.set_height_request(32);
+        let stack = stack.clone();
+        let buttons = nav_buttons.clone();
+        shortcut.connect_clicked(move |_| {
+            stack.set_visible_child_name(target);
+            for b in buttons.borrow().iter() {
+                b.remove_css_class("selected");
+            }
+            let index = match target {
+                "dashboard" => 0,
+                "files" => 1,
+                "network" => 2,
+                "tools" => 4,
+                _ => 0,
+            };
+            if let Some(b) = buttons.borrow().get(index) {
+                b.add_css_class("selected");
+            }
+        });
+        footer.append(&shortcut);
+    }
     footer.append(&indicator);
     footer.append(&clock);
     root.append(&footer);
+    let alert = label("", "alert-banner");
+    alert.set_visible(false);
+    root.prepend(&alert);
     window.set_child(Some(&root));
+    window.set_cursor_from_name(Some("default"));
+    let motion = gtk::EventControllerMotion::new();
+    let weak_cursor = window.downgrade();
+    motion.connect_enter(move |_, _, _| {
+        if let Some(w) = weak_cursor.upgrade() {
+            w.set_cursor_from_name(Some("default"));
+        }
+    });
+    window.add_controller(motion);
+    let notification_app = app.clone();
+    let network_indicator = indicator.clone();
+    let ns = network_status.clone();
+    let prefs = preferences.clone();
+    let last_state = Rc::new(RefCell::new(String::new()));
+    crate::network::subscribe(move |state| {
+        network_indicator.set_text(&format!("● NETWORK {state}"));
+        ns.set_text(&format!("{state} / NetworkManager live events"));
+        let degraded = state != "ONLINE";
+        alert.set_visible(degraded);
+        alert.set_text(&format!("COMMUNICATIONS ALERT / {state}"));
+        if degraded {
+            network_indicator.add_css_class("warning");
+        } else {
+            network_indicator.remove_css_class("warning");
+        }
+        let mut previous = last_state.borrow_mut();
+        if *previous != state {
+            if !previous.is_empty() || degraded {
+                let notification = gio::Notification::new(if degraded {
+                    "LCARS: connection unavailable"
+                } else {
+                    "LCARS: connection restored"
+                });
+                notification.set_body(Some(&format!("Network state: {state}")));
+                notification.set_priority(if degraded {
+                    gio::NotificationPriority::Urgent
+                } else {
+                    gio::NotificationPriority::Normal
+                });
+                notification_app.send_notification(Some("lcars-network"), &notification);
+                if prefs.borrow().sound {
+                    std::thread::spawn(|| {
+                        let _ = services::command("canberra-gtk-play", &["-i", "dialog-warning"]);
+                    });
+                }
+            }
+            let log_dir = services::home().join(".local/state/lcars-desktop");
+            let _ = std::fs::create_dir_all(&log_dir);
+            use std::io::Write;
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(log_dir.join("network-events.log"))
+            {
+                let _ = writeln!(
+                    f,
+                    "{} {state}",
+                    glib::DateTime::now_local()
+                        .and_then(|d| d.format("%Y-%m-%d %H:%M:%S"))
+                        .map(|v| v.to_string())
+                        .unwrap_or_default()
+                );
+            }
+            *previous = state;
+        }
+    });
     let keys = gtk::EventControllerKey::new();
     let weak = window.downgrade();
     keys.connect_key_pressed(move |_, key, _, _| {
@@ -214,7 +351,6 @@ pub fn build(app: &gtk::Application) {
     });
     window.add_controller(keys);
     let rx = services::monitor();
-    let mut previous = String::new();
     let mut last_update = std::time::Instant::now();
     let weak = window.downgrade();
     glib::timeout_add_local(Duration::from_millis(250), move || {
@@ -245,19 +381,6 @@ pub fn build(app: &gtk::Application) {
                 "STORAGE / SIZE · USED · AVAILABLE · USE\n{}",
                 s.storage
             ));
-            indicator.set_text(&format!("● {}", s.network));
-            if s.network == "OFFLINE" || s.network == "LIMITED" {
-                indicator.add_css_class("warning");
-            } else {
-                indicator.remove_css_class("warning");
-            }
-            network_status.set_text(&format!("{}\nReceive {:.0} KiB/s   •   Transmit {:.0} KiB/s\nState sampled every 5 seconds; reachability follows NetworkManager's check policy.",s.network,s.received as f64/1024.0,s.transmitted as f64/1024.0));
-            if previous == "ONLINE" && s.network == "OFFLINE" && preferences.borrow().sound {
-                std::thread::spawn(|| {
-                    let _ = services::command("canberra-gtk-play", &["-i", "dialog-warning"]);
-                });
-            }
-            previous = s.network;
             if !s.error.is_empty() {
                 indicator.set_tooltip_text(Some(&s.error));
             }
@@ -284,8 +407,9 @@ fn settings_page(prefs: &Rc<RefCell<Preferences>>) -> gtk::Box {
         "CONSOLE PREFERENCES",
         "Local settings • Changes are stored in your Fedora user profile.",
     );
-    let sound =
-        gtk::CheckButton::with_label("Play an alert when an online connection goes offline");
+    let sound = gtk::CheckButton::with_label(
+        "Play connection-change sounds (desktop and in-app alerts always enabled)",
+    );
     sound.set_active(prefs.borrow().sound);
     sound.set_height_request(56);
     let result = label("", "muted");
@@ -305,7 +429,7 @@ fn settings_page(prefs: &Rc<RefCell<Preferences>>) -> gtk::Box {
     p.append(&label("DEVELOPMENT BASELINE", "eyebrow"));
     p.append(&label("Rust 1.98.1 • GTK 4.10 / gtk4-rs 0.9\nFedora 38 is end-of-life. Migrate to a supported Fedora release before deployment.\nThis is a desktop application; GNOME continues to manage windows and your session.", "muted"));
     p.append(&label("VALIDATION STILL REQUIRED", "eyebrow"));
-    p.append(&label("Physical touchscreen and on-screen keyboard • real PC sensors • x86-64 build • audio alert on actual hardware • speed-test provider • desktop-session integration", "muted"));
+    p.append(&label("Physical touchscreen and on-screen keyboard • real PC sensors • x86-64 build • audio alert on actual hardware • desktop-session integration", "muted"));
     p
 }
 
@@ -371,8 +495,7 @@ fn network_page() -> (gtk::Box, gtk::Label) {
         }
     });
     p.append(&launch_message);
-    p.append(&label("SPEED TEST / NOT CONFIGURED", "eyebrow"));
-    p.append(&label("Choose a measurement provider and data-transfer limits before enabling tests. Network transfer rates above are live interface traffic, not a speed-test result. Automated repairs and external probes are not enabled in this prototype.", "muted"));
+    p.append(&crate::tools::speed_panel());
     (p, status)
 }
 
@@ -431,6 +554,7 @@ struct FileItem {
     name: String,
     directory: bool,
     details: String,
+    size: u64,
 }
 
 fn load_directory(
@@ -463,6 +587,10 @@ fn load_directory(
                     .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
                     .map(|s| s.as_secs())
                     .unwrap_or(0);
+                let modified = glib::DateTime::from_unix_local(modified as i64)
+                    .and_then(|d| d.format("%Y-%m-%d %H:%M:%S"))
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|_| "Unavailable".into());
                 let kind = if meta.file_type().is_symlink() {
                     "Symbolic link"
                 } else if directory {
@@ -474,8 +602,9 @@ fn load_directory(
                     path: item.path(),
                     name: item.file_name().to_string_lossy().to_string(),
                     directory,
+                    size: meta.len(),
                     details: format!(
-                        "{kind}\n{} bytes\nPermissions {:o}\nModified Unix time: {modified}\n{}",
+                        "{kind}\n{} bytes\nPermissions {:o}\nModified: {modified}\n{}",
                         meta.len(),
                         meta.permissions().mode() & 0o777,
                         item.path().display()
@@ -504,16 +633,42 @@ fn load_directory(
                 match result {
                     Ok(items) => {
                         for item in &items {
-                            let l = label(
-                                &format!(
-                                    "{}   {}",
-                                    if item.directory { "▰" } else { "▱" },
-                                    item.name
-                                ),
-                                "file-row",
+                            let r = row(12);
+                            r.add_css_class("file-row");
+                            r.set_height_request(44);
+                            let icon = gtk::DrawingArea::new();
+                            icon.set_content_width(30);
+                            icon.set_content_height(24);
+                            let directory = item.directory;
+                            icon.set_draw_func(move |_, c, _, _| {
+                                c.set_source_rgb(1.0, 0.73, 0.25);
+                                c.rectangle(2.0, 7.0, 25.0, 14.0);
+                                if directory {
+                                    c.rectangle(2.0, 3.0, 11.0, 5.0);
+                                }
+                                let _ = c.fill();
+                                c.set_source_rgb(0.0, 0.0, 0.0);
+                                c.rectangle(7.0, 11.0, 17.0, 2.0);
+                                c.rectangle(7.0, 16.0, 12.0, 2.0);
+                                let _ = c.fill();
+                            });
+                            r.append(&icon);
+                            let name = label(&item.name, "file-name");
+                            name.set_hexpand(true);
+                            name.set_wrap(false);
+                            name.set_ellipsize(gtk::pango::EllipsizeMode::Middle);
+                            r.append(&name);
+                            let size = label(
+                                &if item.directory {
+                                    "DIRECTORY".into()
+                                } else {
+                                    format!("{} B", item.size)
+                                },
+                                "muted",
                             );
-                            l.set_height_request(48);
-                            list.append(&l);
+                            size.set_width_request(90);
+                            r.append(&size);
+                            list.append(&r);
                         }
                         status.set_text(&format!(
                             "{} entries{} • select to view metadata",
@@ -551,7 +706,7 @@ fn files_page(window: &gtk::ApplicationWindow) -> gtk::Box {
     let path = gtk::Entry::new();
     path.set_hexpand(true);
     path.set_text(&services::home().to_string_lossy());
-    let go = button("GO", "primary");
+    let go = button("GO / REFRESH", "primary");
     controls.append(&home);
     controls.append(&up);
     controls.append(&path);
@@ -561,42 +716,9 @@ fn files_page(window: &gtk::ApplicationWindow) -> gtk::Box {
     let drives = row(8);
     let root = button("C:  SYSTEM /", "secondary");
     drives.append(&root);
-    let volume_text = label(
-        "Other mounts: use their Linux paths. Stable drive-letter assignment is pending.",
-        "muted",
-    );
-    p.append(&volume_text);
-    let update_mounts = move |monitor: &gio::VolumeMonitor| {
-        let names: Vec<String> = monitor
-            .mounts()
-            .iter()
-            .map(|m| format!("{} → {}", m.name(), m.root().parse_name()))
-            .collect();
-        volume_text.set_text(&format!(
-            "MOUNTED VOLUMES\n{}\nAdditional drive letters are not assigned yet.",
-            if names.is_empty() {
-                "No additional user volumes".to_string()
-            } else {
-                names.join("\n")
-            }
-        ));
-    };
-    update_mounts(&volumes);
-    // A fresh page is built each application launch; hotplug is reported by the monitor below.
-    let mount_label = label("", "muted");
-    let mount_label2 = mount_label.clone();
-    volumes.connect_mount_added(move |_, m| {
-        mount_label2.set_text(&format!(
-            "Volume connected: {}. Navigate using its Linux path.",
-            m.name()
-        ))
-    });
-    let mount_label2 = mount_label.clone();
-    volumes.connect_mount_removed(move |_, m| {
-        mount_label2.set_text(&format!("Volume removed: {}", m.name()))
-    });
     p.append(&drives);
-    p.append(&mount_label);
+    let mounted = row(8);
+    p.append(&mounted);
     let status = label("", "muted");
     p.append(&status);
     let content = row(16);
@@ -624,6 +746,19 @@ fn files_page(window: &gtk::ApplicationWindow) -> gtk::Box {
     content.append(&detail);
     p.append(&content);
     let entries: Rc<RefCell<Vec<FileItem>>> = Rc::new(RefCell::new(Vec::new()));
+    let filter = gtk::SearchEntry::new();
+    filter.set_placeholder_text(Some("FILTER CURRENT DIRECTORY"));
+    let list_copy = list.clone();
+    let es_filter = entries.clone();
+    filter.connect_search_changed(move |search| {
+        let query = search.text().to_lowercase();
+        for (i, item) in es_filter.borrow().iter().enumerate() {
+            if let Some(r) = list_copy.row_at_index(i as i32) {
+                r.set_visible(item.name.to_lowercase().contains(&query));
+            }
+        }
+    });
+    p.insert_child_after(&filter, Some(&controls));
     let generation = Rc::new(Cell::new(0u64));
     let navigate: Rc<dyn Fn(PathBuf)> = {
         let list = list.clone();
@@ -634,6 +769,7 @@ fn files_page(window: &gtk::ApplicationWindow) -> gtk::Box {
         let open = open.clone();
         let trash = trash.clone();
         Rc::new(move |target| {
+            filter.set_text("");
             path.set_text(&target.to_string_lossy());
             metadata.set_text("Select a file or folder.");
             open.set_sensitive(false);
@@ -647,6 +783,53 @@ fn files_page(window: &gtk::ApplicationWindow) -> gtk::Box {
             );
         })
     };
+    let update_mounts: Rc<dyn Fn(&gio::VolumeMonitor)> = {
+        let mounted = mounted.clone();
+        let navigate = navigate.clone();
+        let status = status.clone();
+        Rc::new(move |monitor| {
+            while let Some(c) = mounted.first_child() {
+                mounted.remove(&c);
+            }
+            let mounts = monitor.mounts();
+            let ids: Vec<String> = mounts
+                .iter()
+                .map(|m| {
+                    m.uuid()
+                        .map(|v| v.to_string())
+                        .unwrap_or_else(|| m.root().uri().to_string())
+                })
+                .collect();
+            match services::drive_labels(&ids) {
+                Ok(labels) => {
+                    for (mount, letter) in mounts.iter().zip(labels) {
+                        if let Some(path) = mount.root().path() {
+                            let b = button(&format!("{letter} {}", mount.name()), "secondary");
+                            b.set_tooltip_text(Some(&path.to_string_lossy()));
+                            let n = navigate.clone();
+                            b.connect_clicked(move |_| n(path.clone()));
+                            mounted.append(&b);
+                        }
+                    }
+                }
+                Err(e) => status.set_text(&e),
+            }
+        })
+    };
+    update_mounts(&volumes);
+    let update = update_mounts.clone();
+    volumes.connect_mount_added(move |m, _| update(m));
+    volumes.connect_mount_removed(move |m, _| update_mounts(m));
+    for (name, target) in [
+        ("DOCUMENTS", services::home().join("Documents")),
+        ("DOWNLOADS", services::home().join("Downloads")),
+        ("EXCHANGE", PathBuf::from("/mnt/macos")),
+    ] {
+        let b = button(name, "compact");
+        let n = navigate.clone();
+        b.connect_clicked(move |_| n(target.clone()));
+        drives.append(&b);
+    }
     let n = navigate.clone();
     home.connect_clicked(move |_| n(services::home()));
     let n = navigate.clone();
