@@ -82,3 +82,19 @@ textview, textview text { background:#000; color:#beaad9; }
 .dock-button { background:#a49acb; color:#000; padding:3px 12px; border-radius:0; font-size:10px; }
 .dock-button:first-child {background:#ffb938; border-radius:18px 0 0 18px;}
 .footer { border-top:4px solid #c785ad; padding:4px 10px; }
+
+/* Small reference-fidelity pass: title-strip segments and instrument frames. */
+.masthead { padding:7px 10px; }
+.header-cap { background:#ffcb64; border-radius:24px 0 0 24px; margin:7px 0; }
+.brand { font-size:29px; margin-right:4px; }
+.masthead-sub { min-height:18px; }
+.page-title { font-size:14px; padding:3px 9px; border-radius:10px 0 0 0; }
+.title-segment-coral { background:#cd747d; }
+.title-segment-lilac { background:#a299d3; }
+.title-segment-amber { background:#ffcb64; border-radius:0 14px 14px 0; }
+.telemetry-panel { border-top:0; border-radius:10px 0 0 0; padding:0 0 10px; }
+.instrument-title { background:#cd747d; color:#000; font-size:11px; font-weight:800; padding:4px 9px; border-radius:9px 0 0 0; }
+.telemetry-panel .metric { margin:0 12px; }
+.telemetry-panel progressbar { margin:0 12px; }
+.console-clock { color:#ffcb64; font-size:16px; font-weight:800; }
+.nav.selected { background:#ffb938; }

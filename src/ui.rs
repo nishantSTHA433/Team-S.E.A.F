@@ -33,7 +33,21 @@ fn page(title: &str, subtitle: &str) -> gtk::Box {
     p.set_margin_bottom(10);
     p.set_margin_start(24);
     p.set_margin_end(24);
-    p.append(&label(title, "page-title"));
+    let titlebar = row(3);
+    let heading = label(title, "page-title");
+    heading.set_hexpand(true);
+    titlebar.append(&heading);
+    for class in [
+        "title-segment-coral",
+        "title-segment-lilac",
+        "title-segment-amber",
+    ] {
+        let segment = column(0);
+        segment.add_css_class(class);
+        segment.set_width_request(20);
+        titlebar.append(&segment);
+    }
+    p.append(&titlebar);
     p.append(&label(subtitle, "muted"));
     p
 }
@@ -51,7 +65,8 @@ fn card(title: &str) -> (gtk::Box, gtk::Label, gtk::ProgressBar) {
     let c = column(12);
     c.add_css_class("card");
     c.set_hexpand(true);
-    c.append(&label(title, "eyebrow"));
+    c.add_css_class("telemetry-panel");
+    c.append(&label(title, "instrument-title"));
     let value = label("—", "metric");
     let bar = gtk::ProgressBar::new();
     c.append(&value);
@@ -76,9 +91,13 @@ pub fn build(app: &gtk::Application) {
         .build();
     let preferences = Rc::new(RefCell::new(Preferences::load()));
     let root = column(0);
-    let header = row(12);
+    let header = row(5);
     header.add_css_class("masthead");
     let brand = label("LCARS 40282", "brand");
+    let cap = column(0);
+    cap.add_css_class("header-cap");
+    cap.set_width_request(18);
+    header.append(&cap);
     header.append(&brand);
     let sub = label("LIBRARY COMPUTER ACCESS / RETRIEVAL SYSTEM", "masthead-sub");
     sub.set_hexpand(true);
@@ -171,8 +190,10 @@ pub fn build(app: &gtk::Application) {
         .build();
     let (cpu_card, cpu_value, cpu_bar) = card("01 / PROCESSOR LOAD");
     let (mem_card, mem_value, mem_bar) = card("02 / MEMORY UTILIZATION");
-    let (net_card, net_value, _) = card("03 / NETWORK RECEIVE");
-    let (time_card, time_value, _) = card("04 / SYSTEM UPTIME");
+    let (net_card, net_value, net_bar) = card("03 / NETWORK RECEIVE");
+    net_bar.set_visible(false);
+    let (time_card, time_value, time_bar) = card("04 / SYSTEM UPTIME");
+    time_bar.set_visible(false);
     metrics.attach(&cpu_card, 0, 0, 1, 1);
     metrics.attach(&mem_card, 1, 0, 1, 1);
     metrics.attach(&net_card, 0, 1, 1, 1);
@@ -228,7 +249,7 @@ pub fn build(app: &gtk::Application) {
     footer.add_css_class("footer");
     let indicator = label("● CHECKING NETWORK", "status");
     indicator.set_hexpand(true);
-    let clock = label("", "muted");
+    let clock = label("", "console-clock");
     for (title, target) in [
         ("LCARS", "dashboard"),
         ("FILES", "files"),
