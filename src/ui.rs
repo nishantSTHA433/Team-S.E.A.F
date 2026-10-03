@@ -1,6 +1,7 @@
 use crate::services::{self, Preferences};
 use gtk::{gio, glib, prelude::*};
 use std::cell::{Cell, RefCell};
+use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
@@ -143,8 +144,8 @@ pub fn build(app: &gtk::Application) {
     hero_text.append(&label("SYSTEM AVAILABLE", "hero"));
     hero_text.append(&label("STATION ID 1440–900  /  OPERATIONS ONLINE", "muted"));
     let emblem = gtk::DrawingArea::new();
-    emblem.set_content_width(140);
-    emblem.set_content_height(140);
+    emblem.set_content_width(160);
+    emblem.set_content_height(160);
     emblem.set_draw_func(|_, cr, w, h| {
         let cx = w as f64 / 2.0;
         let cy = h as f64 / 2.0;
@@ -167,6 +168,26 @@ pub fn build(app: &gtk::Application) {
             );
             let _ = cr.fill();
         }
+        // Paired leaf silhouettes frame the star field without raster scaling artifacts.
+        cr.set_source_rgb(0.67, 0.66, 0.77);
+        for side in [-1.0, 1.0] {
+            for i in 0..9 {
+                let a = -1.05 + i as f64 * 0.24;
+                let x = cx + side * 65.0 * a.cos();
+                let y = cy + 66.0 * a.sin();
+                cr.move_to(x, y + 9.0);
+                cr.curve_to(
+                    x + side * 13.0,
+                    y + 3.0,
+                    x + side * 10.0,
+                    y - 10.0,
+                    x + side * 8.0,
+                    y - 15.0,
+                );
+                cr.curve_to(x + side * 2.0, y - 6.0, x - side * 4.0, y - 2.0, x, y + 9.0);
+                let _ = cr.fill();
+            }
+        }
         cr.move_to(cx, cy - 22.0);
         cr.line_to(cx + 5.0, cy - 4.0);
         cr.line_to(cx + 22.0, cy);
@@ -180,8 +201,51 @@ pub fn build(app: &gtk::Application) {
     });
     hero.append(&emblem);
     hero.append(&hero_text);
-    let system_id = label("LCARS\n01 / 2026\nFEDORA NODE", "system-id");
-    hero.append(&system_id);
+    let history = Rc::new(RefCell::new(VecDeque::<f64>::with_capacity(60)));
+    let history_panel = column(6);
+    history_panel.add_css_class("history-panel");
+    history_panel.set_width_request(210);
+    history_panel.append(&label("CPU / RECENT HISTORY", "instrument-title"));
+    let plot = gtk::DrawingArea::new();
+    plot.set_content_width(200);
+    plot.set_content_height(88);
+    plot.set_tooltip_text(Some(
+        "CPU utilization: 0–100%. Up to 60 recent telemetry samples; newest at right.",
+    ));
+    let samples = history.clone();
+    plot.set_draw_func(move |_, cr, w, h| {
+        let width = (w - 2).max(1) as f64;
+        let height = (h - 2).max(1) as f64;
+        cr.set_source_rgb(0.20, 0.16, 0.28);
+        cr.set_line_width(1.0);
+        for i in 0..=4 {
+            let y = 1.0 + height * i as f64 / 4.0;
+            cr.move_to(1.0, y);
+            cr.line_to(width + 1.0, y);
+        }
+        for i in 0..=10 {
+            let x = 1.0 + width * i as f64 / 10.0;
+            cr.move_to(x, 1.0);
+            cr.line_to(x, height + 1.0);
+        }
+        let _ = cr.stroke();
+        cr.set_source_rgb(1.0, 0.76, 0.31);
+        cr.set_line_width(1.5);
+        let values = samples.borrow();
+        for (i, value) in values.iter().enumerate() {
+            let x = 1.0 + width * (60 - values.len() + i) as f64 / 59.0;
+            let y = 1.0 + height * (1.0 - value / 100.0);
+            if i == 0 {
+                cr.move_to(x, y);
+            } else {
+                cr.line_to(x, y);
+            }
+        }
+        let _ = cr.stroke();
+    });
+    history_panel.append(&plot);
+    history_panel.append(&label("0–100% / LIVE SAMPLES", "graph-scale"));
+    hero.append(&history_panel);
     dashboard.append(&hero);
     let metrics = gtk::Grid::builder()
         .column_spacing(14)
@@ -380,6 +444,14 @@ pub fn build(app: &gtk::Application) {
         }
         while let Ok(s) = rx.try_recv() {
             last_update = std::time::Instant::now();
+            {
+                let mut samples = history.borrow_mut();
+                if samples.len() == 60 {
+                    samples.pop_front();
+                }
+                samples.push_back(s.cpu.clamp(0.0, 100.0));
+            }
+            plot.queue_draw();
             cpu_value.set_text(&format!("{:.0}%", s.cpu));
             cpu_bar.set_fraction(s.cpu / 100.0);
             mem_value.set_text(&format!(
@@ -472,6 +544,10 @@ fn network_page() -> (gtk::Box, gtk::Label) {
     output.set_monospace(true);
     output.set_wrap_mode(gtk::WrapMode::WordChar);
     output.buffer().set_text("Run diagnostics to inspect adapters, addresses, routes, and DNS configuration.\nNo connection will be changed.");
+    p.append(&label(
+        "ADAPTERS / ROUTES / NAME RESOLUTION",
+        "instrument-title",
+    ));
     let report_scroll = scrolled(&output);
     report_scroll.set_min_content_height(230);
     p.append(&report_scroll);
@@ -749,11 +825,23 @@ fn files_page(window: &gtk::ApplicationWindow) -> gtk::Box {
     list.set_selection_mode(gtk::SelectionMode::Single);
     let list_scroll = scrolled(&list);
     list_scroll.set_min_content_height(250);
-    content.append(&list_scroll);
+    let file_table = column(0);
+    file_table.set_hexpand(true);
+    let headings = row(12);
+    headings.add_css_class("file-headings");
+    let name_heading = label("NAME", "table-heading");
+    name_heading.set_hexpand(true);
+    headings.append(&name_heading);
+    let size_heading = label("SIZE / TYPE", "table-heading");
+    size_heading.set_width_request(90);
+    headings.append(&size_heading);
+    file_table.append(&headings);
+    file_table.append(&list_scroll);
+    content.append(&file_table);
     let detail = column(12);
     detail.set_width_request(240);
     detail.add_css_class("card");
-    detail.append(&label("SELECTION DETAILS", "eyebrow"));
+    detail.append(&label("SELECTION DETAILS", "instrument-title"));
     let metadata = label("Select a file or folder.", "muted");
     metadata.set_selectable(true);
     metadata.set_wrap_mode(gtk::pango::WrapMode::WordChar);

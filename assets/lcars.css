@@ -98,3 +98,13 @@ textview, textview text { background:#000; color:#beaad9; }
 .telemetry-panel progressbar { margin:0 12px; }
 .console-clock { color:#ffcb64; font-size:16px; font-weight:800; }
 .nav.selected { background:#ffb938; }
+
+/* Reference pass 4: compact instruments, readable data tables, live graph. */
+.hero { font-size:30px; }
+.history-panel { border:1px solid #867dac; border-radius:9px 0 0 0; background:#000; }
+.graph-scale { color:#c395c6; font-size:10px; margin:0 8px 6px; }
+.file-headings { background:#a299d3; padding:4px 8px; border-bottom:3px solid #000; }
+.table-heading { color:#000; font-weight:800; font-size:11px; }
+.directory row:selected .file-row, .directory row:selected .muted { color:#000; }
+progressbar trough, progressbar progress { border-radius:0; }
+.directory { border-radius:0; border-left:3px solid #a299d3; }
