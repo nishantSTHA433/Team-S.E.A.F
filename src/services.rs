@@ -22,6 +22,8 @@ pub struct Snapshot {
 pub struct Preferences {
     pub sound: bool,
     pub reduced_motion: bool,
+    #[serde(default)]
+    pub workspace_mode: bool,
 }
 
 impl Default for Preferences {
@@ -29,6 +31,7 @@ impl Default for Preferences {
         Self {
             sound: true,
             reduced_motion: true,
+            workspace_mode: false,
         }
     }
 }
@@ -311,5 +314,27 @@ mod drive_tests {
             ["E:", "F:"]
         );
         assert_eq!(assign_drive_labels(&mut map, &["disk-a".into()]), ["D:"]);
+    }
+}
+
+#[cfg(test)]
+mod preference_tests {
+    use super::Preferences;
+    #[test]
+    fn old_preferences_preserve_sound_and_default_to_single_page() {
+        let p: Preferences =
+            serde_json::from_str(r#"{"sound":false,"reduced_motion":true}"#).unwrap();
+        assert!(!p.sound);
+        assert!(!p.workspace_mode);
+    }
+    #[test]
+    fn workspace_mode_survives_serialization() {
+        let p = Preferences {
+            workspace_mode: true,
+            ..Preferences::default()
+        };
+        let restored: Preferences =
+            serde_json::from_str(&serde_json::to_string(&p).unwrap()).unwrap();
+        assert!(restored.workspace_mode);
     }
 }

@@ -1,3 +1,57 @@
+fn draw_emblem(_: &gtk::DrawingArea, cr: &gtk::cairo::Context, w: i32, h: i32) {
+    let cx = w as f64 / 2.0;
+    let cy = h as f64 / 2.0;
+    cr.set_source_rgb(0.03, 0.03, 0.15);
+    cr.arc(cx, cy, 52.0, 0.0, std::f64::consts::TAU);
+    let _ = cr.fill();
+    cr.set_source_rgb(0.67, 0.63, 0.82);
+    cr.set_line_width(2.0);
+    cr.arc(cx, cy, 54.0, 0.0, std::f64::consts::TAU);
+    let _ = cr.stroke();
+    for i in 0..36 {
+        let angle = i as f64 * 2.39996;
+        let radius = 8.0 + (i as f64 * 7.0) % 43.0;
+        cr.arc(
+            cx + angle.cos() * radius,
+            cy + angle.sin() * radius,
+            if i % 5 == 0 { 1.6 } else { 0.7 },
+            0.0,
+            std::f64::consts::TAU,
+        );
+        let _ = cr.fill();
+    }
+    // Paired leaf silhouettes frame the star field without raster scaling artifacts.
+    cr.set_source_rgb(0.67, 0.66, 0.77);
+    for side in [-1.0, 1.0] {
+        for i in 0..9 {
+            let a = -1.05 + i as f64 * 0.24;
+            let x = cx + side * 65.0 * a.cos();
+            let y = cy + 66.0 * a.sin();
+            cr.move_to(x, y + 9.0);
+            cr.curve_to(
+                x + side * 13.0,
+                y + 3.0,
+                x + side * 10.0,
+                y - 10.0,
+                x + side * 8.0,
+                y - 15.0,
+            );
+            cr.curve_to(x + side * 2.0, y - 6.0, x - side * 4.0, y - 2.0, x, y + 9.0);
+            let _ = cr.fill();
+        }
+    }
+    cr.move_to(cx, cy - 22.0);
+    cr.line_to(cx + 5.0, cy - 4.0);
+    cr.line_to(cx + 22.0, cy);
+    cr.line_to(cx + 5.0, cy + 4.0);
+    cr.line_to(cx, cy + 22.0);
+    cr.line_to(cx - 5.0, cy + 4.0);
+    cr.line_to(cx - 22.0, cy);
+    cr.line_to(cx - 5.0, cy - 4.0);
+    cr.close_path();
+    let _ = cr.fill();
+}
+
 use crate::services::{self, Preferences};
 use gtk::{gio, glib, prelude::*};
 use std::cell::{Cell, RefCell};
@@ -75,6 +129,203 @@ fn card(title: &str) -> (gtk::Box, gtk::Label, gtk::ProgressBar) {
     (c, value, bar)
 }
 
+type Navigate = Rc<dyn Fn(&str)>;
+type SetMode = Rc<dyn Fn(bool)>;
+const PANELS: [(&str, &str); 6] = [
+    ("dashboard", "SYSTEM"),
+    ("files", "FILES"),
+    ("network", "NETWORK"),
+    ("apps", "APPLICATIONS"),
+    ("tools", "UTILITIES"),
+    ("settings", "PREFERENCES"),
+];
+
+fn workspace(single: &gtk::Stack) -> (gtk::Stack, Navigate, SetMode) {
+    let host = gtk::Stack::new();
+    host.set_hexpand(true);
+    host.set_vexpand(true);
+    host.add_named(single, Some("single"));
+    let grid = gtk::Grid::builder()
+        .column_spacing(8)
+        .row_spacing(8)
+        .column_homogeneous(true)
+        .row_homogeneous(true)
+        .build();
+    grid.set_margin_start(10);
+    grid.set_margin_end(10);
+    grid.set_margin_top(10);
+    grid.set_margin_bottom(10);
+    let overlay = gtk::Overlay::new();
+    let background = gtk::DrawingArea::new();
+    background.set_hexpand(true);
+    background.set_vexpand(true);
+    let opened = Rc::new(RefCell::new(vec!["dashboard".to_owned()]));
+    let active = Rc::new(Cell::new(false));
+    let background_panels = opened.clone();
+    background.set_draw_func(move |area, cr, w, h| {
+        let count = background_panels.borrow().len();
+        let size = if count == 0 { 320.0 } else { 180.0 };
+        let x = if count == 0 {
+            (w as f64 - size) / 2.0
+        } else {
+            (w as f64 - size - 12.0).max(0.0)
+        };
+        let y = if count == 0 {
+            (h as f64 - size) / 2.0
+        } else {
+            (h as f64 - size - 12.0).max(0.0)
+        };
+        let _ = cr.save();
+        cr.translate(x, y);
+        cr.scale(size / 160.0, size / 160.0);
+        draw_emblem(area, cr, 160, 160);
+        let _ = cr.restore();
+    });
+    overlay.set_child(Some(&background));
+    let scroll = scrolled(&grid);
+    scroll.set_hexpand(true);
+    scroll.set_vexpand(true);
+    overlay.add_overlay(&scroll);
+    host.add_named(&overlay, Some("workspace"));
+    let pages: Rc<Vec<gtk::Widget>> = Rc::new(
+        PANELS
+            .iter()
+            .map(|(name, _)| single.child_by_name(name).expect("Registered page"))
+            .collect(),
+    );
+    let frames: Rc<Vec<gtk::Box>> = Rc::new(
+        PANELS
+            .iter()
+            .map(|(_, title)| {
+                let frame = column(0);
+                frame.add_css_class("workspace-frame");
+                frame.set_hexpand(true);
+                frame.set_vexpand(true);
+                let bar = row(4);
+                bar.add_css_class("workspace-title");
+                let name = label(title, "instrument-title");
+                name.set_hexpand(true);
+                bar.append(&name);
+                frame.append(&bar);
+                frame
+            })
+            .collect(),
+    );
+    let layout_key = Rc::new(Cell::new((0, 0, 0usize)));
+    let arrange: Rc<dyn Fn()> = {
+        let grid = grid.clone();
+        let frames = frames.clone();
+        let opened = opened.clone();
+        let background = background.clone();
+        let overlay = overlay.clone();
+        let layout_key = layout_key.clone();
+        Rc::new(move || {
+            while let Some(child) = grid.first_child() {
+                grid.remove(&child);
+            }
+            let names = opened.borrow();
+            let width = overlay.width();
+            let height = overlay.height();
+            let cols = if width >= 1150 && names.len() > 1 {
+                2
+            } else {
+                1
+            };
+            let rows = names.len().div_ceil(cols).max(1);
+            let panel_height = ((height - 20 - (rows as i32 - 1) * 8) / rows as i32).max(230);
+            for (i, name) in names.iter().enumerate() {
+                let index = PANELS
+                    .iter()
+                    .position(|(id, _)| id == name)
+                    .expect("Registered panel");
+                frames[index].set_height_request(panel_height);
+                grid.attach(&frames[index], (i % cols) as i32, (i / cols) as i32, 1, 1);
+            }
+            layout_key.set((width, height, names.len()));
+            background.queue_draw();
+        })
+    };
+    for (index, frame) in frames.iter().enumerate() {
+        let bar = frame.first_child().unwrap().downcast::<gtk::Box>().unwrap();
+        let close = button("CLOSE", "compact");
+        close.set_height_request(36);
+        let opened = opened.clone();
+        let arrange = arrange.clone();
+        close.connect_clicked(move |_| {
+            opened.borrow_mut().retain(|name| name != PANELS[index].0);
+            arrange();
+        });
+        bar.append(&close);
+    }
+    let navigate: Navigate = {
+        let single = single.clone();
+        let active = active.clone();
+        let opened = opened.clone();
+        let arrange = arrange.clone();
+        Rc::new(move |name| {
+            if active.get() {
+                if !opened.borrow().iter().any(|s| s == name) {
+                    opened.borrow_mut().push(name.to_owned());
+                }
+                arrange();
+            } else {
+                single.set_visible_child_name(name);
+            }
+        })
+    };
+    let set_mode: SetMode = {
+        let single = single.clone();
+        let host = host.clone();
+        let frames = frames.clone();
+        let pages = pages.clone();
+        let active = active.clone();
+        let arrange = arrange.clone();
+        let opened = opened.clone();
+        Rc::new(move |enabled| {
+            if enabled == active.get() {
+                return;
+            }
+            if enabled {
+                if let Some(name) = single.visible_child_name() {
+                    if !opened.borrow().iter().any(|s| s == name.as_str()) {
+                        opened.borrow_mut().push(name.to_string());
+                    }
+                }
+                for (page, frame) in pages.iter().zip(frames.iter()) {
+                    single.remove(page);
+                    if let Ok(scroll) = page.clone().downcast::<gtk::ScrolledWindow>() {
+                        scroll.set_hscrollbar_policy(gtk::PolicyType::Automatic);
+                    }
+                    frame.append(page);
+                }
+                active.set(true);
+                host.set_visible_child_name("workspace");
+                arrange();
+            } else {
+                for (i, (page, frame)) in pages.iter().zip(frames.iter()).enumerate() {
+                    frame.remove(page);
+                    single.add_named(page, Some(PANELS[i].0));
+                }
+                active.set(false);
+                host.set_visible_child_name("single");
+                single.set_visible_child_name("settings");
+            }
+        })
+    };
+    let weak_overlay = overlay.downgrade();
+    overlay.add_tick_callback(move |_, _| {
+        let Some(overlay) = weak_overlay.upgrade() else {
+            return glib::ControlFlow::Break;
+        };
+        let key = (overlay.width(), overlay.height(), opened.borrow().len());
+        if active.get() && key != layout_key.get() {
+            arrange();
+        }
+        glib::ControlFlow::Continue
+    });
+    (host, navigate, set_mode)
+}
+
 pub fn build(app: &gtk::Application) {
     let css = gtk::CssProvider::new();
     css.load_from_data(include_str!("../assets/lcars.css"));
@@ -146,59 +397,7 @@ pub fn build(app: &gtk::Application) {
     let emblem = gtk::DrawingArea::new();
     emblem.set_content_width(160);
     emblem.set_content_height(160);
-    emblem.set_draw_func(|_, cr, w, h| {
-        let cx = w as f64 / 2.0;
-        let cy = h as f64 / 2.0;
-        cr.set_source_rgb(0.03, 0.03, 0.15);
-        cr.arc(cx, cy, 52.0, 0.0, std::f64::consts::TAU);
-        let _ = cr.fill();
-        cr.set_source_rgb(0.67, 0.63, 0.82);
-        cr.set_line_width(2.0);
-        cr.arc(cx, cy, 54.0, 0.0, std::f64::consts::TAU);
-        let _ = cr.stroke();
-        for i in 0..36 {
-            let angle = i as f64 * 2.39996;
-            let radius = 8.0 + (i as f64 * 7.0) % 43.0;
-            cr.arc(
-                cx + angle.cos() * radius,
-                cy + angle.sin() * radius,
-                if i % 5 == 0 { 1.6 } else { 0.7 },
-                0.0,
-                std::f64::consts::TAU,
-            );
-            let _ = cr.fill();
-        }
-        // Paired leaf silhouettes frame the star field without raster scaling artifacts.
-        cr.set_source_rgb(0.67, 0.66, 0.77);
-        for side in [-1.0, 1.0] {
-            for i in 0..9 {
-                let a = -1.05 + i as f64 * 0.24;
-                let x = cx + side * 65.0 * a.cos();
-                let y = cy + 66.0 * a.sin();
-                cr.move_to(x, y + 9.0);
-                cr.curve_to(
-                    x + side * 13.0,
-                    y + 3.0,
-                    x + side * 10.0,
-                    y - 10.0,
-                    x + side * 8.0,
-                    y - 15.0,
-                );
-                cr.curve_to(x + side * 2.0, y - 6.0, x - side * 4.0, y - 2.0, x, y + 9.0);
-                let _ = cr.fill();
-            }
-        }
-        cr.move_to(cx, cy - 22.0);
-        cr.line_to(cx + 5.0, cy - 4.0);
-        cr.line_to(cx + 22.0, cy);
-        cr.line_to(cx + 5.0, cy + 4.0);
-        cr.line_to(cx, cy + 22.0);
-        cr.line_to(cx - 5.0, cy + 4.0);
-        cr.line_to(cx - 22.0, cy);
-        cr.line_to(cx - 5.0, cy - 4.0);
-        cr.close_path();
-        let _ = cr.fill();
-    });
+    emblem.set_draw_func(draw_emblem);
     hero.append(&emblem);
     hero.append(&hero_text);
     let history = Rc::new(RefCell::new(VecDeque::<f64>::with_capacity(60)));
@@ -272,7 +471,28 @@ pub fn build(app: &gtk::Application) {
     stack.add_named(&scrolled(&network_page), Some("network"));
     stack.add_named(&scrolled(&applications_page()), Some("apps"));
     stack.add_named(&scrolled(&crate::tools::page()), Some("tools"));
-    stack.add_named(&scrolled(&settings_page(&preferences)), Some("settings"));
+    let settings = settings_page(&preferences);
+    let workspace_toggle = gtk::CheckButton::with_label(
+        "WORKSPACE MODE — open tools together (off: single-page navigation)",
+    );
+    workspace_toggle.set_height_request(48);
+    workspace_toggle.set_active(preferences.borrow().workspace_mode);
+    settings.prepend(&workspace_toggle);
+    stack.add_named(&scrolled(&settings), Some("settings"));
+    let (page_host, navigate_panel, set_mode) = workspace(&stack);
+    let mode_result = label("", "muted");
+    settings.append(&mode_result);
+    let cfg = preferences.clone();
+    let apply_mode = set_mode.clone();
+    workspace_toggle.connect_toggled(move |toggle| {
+        apply_mode(toggle.is_active());
+        cfg.borrow_mut().workspace_mode = toggle.is_active();
+        mode_result.set_text(&match cfg.borrow().save() {
+            Ok(()) => "Layout preference saved".into(),
+            Err(e) => format!("Layout active, but could not save: {e}"),
+        });
+    });
+    set_mode(preferences.borrow().workspace_mode);
     let nav_items = [
         ("01  OVERVIEW", "dashboard"),
         ("02  FILES", "files"),
@@ -287,10 +507,10 @@ pub fn build(app: &gtk::Application) {
         if name == "dashboard" {
             b.add_css_class("selected");
         }
-        let st = stack.clone();
+        let navigate = navigate_panel.clone();
         let buttons = nav_buttons.clone();
         b.connect_clicked(move |this| {
-            st.set_visible_child_name(name);
+            navigate(name);
             for b in buttons.borrow().iter() {
                 b.remove_css_class("selected");
             }
@@ -307,7 +527,7 @@ pub fn build(app: &gtk::Application) {
         "rail-footer",
     ));
     body.append(&rail);
-    body.append(&stack);
+    body.append(&page_host);
     root.append(&body);
     let footer = row(12);
     footer.add_css_class("footer");
@@ -322,10 +542,10 @@ pub fn build(app: &gtk::Application) {
     ] {
         let shortcut = button(title, "dock-button");
         shortcut.set_height_request(32);
-        let stack = stack.clone();
+        let navigate = navigate_panel.clone();
         let buttons = nav_buttons.clone();
         shortcut.connect_clicked(move |_| {
-            stack.set_visible_child_name(target);
+            navigate(target);
             for b in buttons.borrow().iter() {
                 b.remove_css_class("selected");
             }
@@ -417,7 +637,31 @@ pub fn build(app: &gtk::Application) {
     });
     let keys = gtk::EventControllerKey::new();
     let weak = window.downgrade();
-    keys.connect_key_pressed(move |_, key, _, _| {
+    let shortcut_navigation = navigate_panel.clone();
+    let shortcut_buttons = nav_buttons.clone();
+    keys.connect_key_pressed(move |_, key, _, modifiers| {
+        if modifiers.contains(gtk::gdk::ModifierType::ALT_MASK) {
+            let target = match key {
+                gtk::gdk::Key::_1 => Some("dashboard"),
+                gtk::gdk::Key::_2 => Some("files"),
+                gtk::gdk::Key::_3 => Some("network"),
+                gtk::gdk::Key::_4 => Some("apps"),
+                gtk::gdk::Key::_5 => Some("tools"),
+                gtk::gdk::Key::_6 => Some("settings"),
+                _ => None,
+            };
+            if let Some(target) = target {
+                shortcut_navigation(target);
+                for (index, button) in shortcut_buttons.borrow().iter().enumerate() {
+                    if PANELS[index].0 == target {
+                        button.add_css_class("selected");
+                    } else {
+                        button.remove_css_class("selected");
+                    }
+                }
+                return glib::Propagation::Stop;
+            }
+        }
         if let Some(w) = weak.upgrade() {
             if key == gtk::gdk::Key::Escape {
                 w.unfullscreen();
@@ -435,6 +679,9 @@ pub fn build(app: &gtk::Application) {
         glib::Propagation::Proceed
     });
     window.add_controller(keys);
+    let adaptive_prefs = preferences.clone();
+    let compact_hero = hero.clone();
+    let dashboard_for_layout = dashboard.clone();
     let rx = services::monitor();
     let mut last_update = std::time::Instant::now();
     let weak = window.downgrade();
@@ -442,6 +689,12 @@ pub fn build(app: &gtk::Application) {
         if weak.upgrade().is_none() {
             return glib::ControlFlow::Break;
         }
+        let available_height = dashboard_for_layout
+            .ancestor(gtk::ScrolledWindow::static_type())
+            .map(|w| w.height())
+            .unwrap_or(700);
+        compact_hero
+            .set_visible(!adaptive_prefs.borrow().workspace_mode || available_height >= 440);
         while let Ok(s) = rx.try_recv() {
             last_update = std::time::Instant::now();
             {
@@ -792,6 +1045,216 @@ fn load_directory(
     });
 }
 
+type PreviewUpdate = Rc<dyn Fn(Option<PathBuf>)>;
+fn media_preview(window: &gtk::ApplicationWindow) -> (gtk::Box, PreviewUpdate) {
+    let panel = column(8);
+    panel.add_css_class("preview-panel");
+    panel.append(&label("MEDIA PREVIEW", "instrument-title"));
+    let picture = gtk::Picture::new();
+    picture.set_can_shrink(true);
+    picture.set_content_fit(gtk::ContentFit::Contain);
+    picture.set_height_request(180);
+    picture.set_visible(false);
+    let video = gtk::Video::new();
+    video.set_autoplay(false);
+    video.set_height_request(180);
+    video.set_visible(false);
+    video.connect_unmap(|v| {
+        if let Some(s) = v.media_stream() {
+            s.pause();
+        }
+    });
+    let info = label("Select an image or video.", "muted");
+    let view = button("EXPAND PREVIEW", "secondary");
+    view.set_sensitive(false);
+    panel.append(&picture);
+    panel.append(&video);
+    panel.append(&info);
+    panel.append(&view);
+    let current = Rc::new(RefCell::new(None::<(PathBuf, bool)>));
+    let generation = Rc::new(Cell::new(0u64));
+    let weak = window.downgrade();
+    let selected = current.clone();
+    let thumbnail = picture.clone();
+    let inline_video = video.clone();
+    view.connect_clicked(move |_| {
+        let Some(parent) = weak.upgrade() else { return };
+        let Some((path, is_video)) = selected.borrow().clone() else {
+            return;
+        };
+        if let Some(s) = inline_video.media_stream() {
+            s.pause();
+        }
+        let viewer = gtk::Window::builder()
+            .transient_for(&parent)
+            .title("LCARS / MEDIA VIEWER")
+            .default_width(720)
+            .default_height(540)
+            .build();
+        let body = column(8);
+        body.set_margin_start(12);
+        body.set_margin_end(12);
+        body.set_margin_top(12);
+        body.set_margin_bottom(12);
+        body.append(&label(
+            &path.file_name().unwrap_or_default().to_string_lossy(),
+            "page-title",
+        ));
+        if is_video {
+            let player = gtk::Video::for_filename(Some(&path));
+            player.set_autoplay(true);
+            player.set_hexpand(true);
+            player.set_vexpand(true);
+            player.connect_unmap(|v| {
+                if let Some(s) = v.media_stream() {
+                    s.pause();
+                }
+            });
+            body.append(&player);
+        } else {
+            let full = gtk::Picture::for_paintable(&thumbnail.paintable().expect("Loaded preview"));
+            full.set_content_fit(gtk::ContentFit::Contain);
+            full.set_can_shrink(true);
+            full.set_hexpand(true);
+            full.set_vexpand(true);
+            body.append(&full);
+        }
+        let close = button("CLOSE PREVIEW", "primary");
+        let weak_viewer = viewer.downgrade();
+        close.connect_clicked(move |_| {
+            if let Some(w) = weak_viewer.upgrade() {
+                w.close();
+            }
+        });
+        body.append(&close);
+        viewer.set_child(Some(&body));
+        viewer.present();
+    });
+    let click = gtk::GestureClick::new();
+    let view_button = view.clone();
+    click.connect_released(move |_, _, _, _| {
+        view_button.emit_clicked();
+    });
+    picture.add_controller(click);
+    let update = Rc::new(move |path: Option<PathBuf>| {
+        let request = generation.get().wrapping_add(1);
+        generation.set(request);
+        picture.set_paintable(None::<&gtk::gdk::Paintable>);
+        picture.set_visible(false);
+        if let Some(s) = video.media_stream() {
+            s.pause();
+        }
+        video.set_file(None::<&gio::File>);
+        video.set_visible(false);
+        view.set_sensitive(false);
+        *current.borrow_mut() = None;
+        info.set_text("Select an image or video.");
+        let Some(path) = path else { return };
+        let (content_type, _) = gio::content_type_guess(Some(&path), &[]);
+        let mime = gio::content_type_get_mime_type(&content_type).unwrap_or_default();
+        if mime.starts_with("video/") {
+            video.set_file(Some(&gio::File::for_path(&path)));
+            video.set_visible(true);
+            info.set_text("VIDEO / preparing preview…");
+            *current.borrow_mut() = Some((path, true));
+            if let Some(stream) = video.media_stream() {
+                let info = info.clone();
+                let view = view.clone();
+                let generation = generation.clone();
+                let started = std::time::Instant::now();
+                glib::timeout_add_local(Duration::from_millis(200), move || {
+                    if generation.get() != request {
+                        return glib::ControlFlow::Break;
+                    }
+                    if let Some(error) = stream.error() {
+                        info.set_text(&format!(
+                            "Preview unavailable: {error}. Use OPEN for an external player."
+                        ));
+                        return glib::ControlFlow::Break;
+                    }
+                    if started.elapsed() > Duration::from_secs(20) {
+                        info.set_text(
+                            "Video preparation timed out. Use OPEN for an external player.",
+                        );
+                        return glib::ControlFlow::Break;
+                    }
+                    if stream.is_prepared() {
+                        info.set_text(&format!("VIDEO / {} × {} / {:.1} s\nPress Play on the image, or expand preview.", stream.intrinsic_width(), stream.intrinsic_height(), stream.duration() as f64 / 1_000_000.0));
+                        view.set_sensitive(true);
+                        return glib::ControlFlow::Break;
+                    }
+                    glib::ControlFlow::Continue
+                });
+            }
+        } else if mime.starts_with("image/") {
+            info.set_text("IMAGE / loading preview…");
+            let (tx, rx) = std::sync::mpsc::channel();
+            let source = path.clone();
+            std::thread::spawn(move || {
+                let result = (|| -> Result<(Vec<u8>, i32, i32), String> {
+                    let size = std::fs::metadata(&source).map_err(|e| e.to_string())?.len();
+                    if size > 32 * 1024 * 1024 {
+                        return Err("Image exceeds the 32 MB preview limit; use OPEN".into());
+                    }
+                    let (_, width, height) = gtk::gdk_pixbuf::Pixbuf::file_info(&source)
+                        .ok_or("Unsupported image format")?;
+                    if i64::from(width) * i64::from(height) > 80_000_000 {
+                        return Err("Image exceeds the 80-megapixel preview limit; use OPEN".into());
+                    }
+                    let pixbuf =
+                        gtk::gdk_pixbuf::Pixbuf::from_file_at_scale(&source, 1280, 900, true)
+                            .map_err(|e| e.to_string())?;
+                    Ok((
+                        pixbuf
+                            .save_to_bufferv("png", &[])
+                            .map_err(|e| e.to_string())?,
+                        width,
+                        height,
+                    ))
+                })();
+                let _ = tx.send(result);
+            });
+            let picture = picture.clone();
+            let info = info.clone();
+            let view = view.clone();
+            let current = current.clone();
+            let generation = generation.clone();
+            glib::timeout_add_local(Duration::from_millis(100), move || {
+                if generation.get() != request {
+                    return glib::ControlFlow::Break;
+                }
+                match rx.try_recv() {
+                    Ok(Ok((bytes, w, h))) => {
+                        match gtk::gdk::Texture::from_bytes(&glib::Bytes::from_owned(bytes)) {
+                            Ok(texture) => {
+                                picture.set_paintable(Some(&texture));
+                                picture.set_visible(true);
+                                info.set_text(&format!("IMAGE / {w} × {h} pixels\nTap image to expand. Preview fits without cropping."));
+                                *current.borrow_mut() = Some((path.clone(), false));
+                                view.set_sensitive(true);
+                            }
+                            Err(e) => info.set_text(&format!("Preview unavailable: {e}")),
+                        }
+                        glib::ControlFlow::Break
+                    }
+                    Ok(Err(e)) => {
+                        info.set_text(&format!("Preview unavailable: {e}"));
+                        glib::ControlFlow::Break
+                    }
+                    Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                        info.set_text("Preview worker stopped.");
+                        glib::ControlFlow::Break
+                    }
+                    Err(_) => glib::ControlFlow::Continue,
+                }
+            });
+        } else {
+            info.set_text("No media preview for this item. Properties are shown below.");
+        }
+    });
+    (panel, update)
+}
+
 fn files_page(window: &gtk::ApplicationWindow) -> gtk::Box {
     let p = page(
         "FILE ACCESS",
@@ -839,8 +1302,10 @@ fn files_page(window: &gtk::ApplicationWindow) -> gtk::Box {
     file_table.append(&list_scroll);
     content.append(&file_table);
     let detail = column(12);
-    detail.set_width_request(240);
+    detail.set_width_request(260);
     detail.add_css_class("card");
+    let (preview, update_preview) = media_preview(window);
+    detail.append(&preview);
     detail.append(&label("SELECTION DETAILS", "instrument-title"));
     let metadata = label("Select a file or folder.", "muted");
     metadata.set_selectable(true);
@@ -854,6 +1319,22 @@ fn files_page(window: &gtk::ApplicationWindow) -> gtk::Box {
     detail.append(&trash);
     content.append(&detail);
     p.append(&content);
+    let weak_content = content.downgrade();
+    let weak_page = p.downgrade();
+    p.add_tick_callback(move |_, _| {
+        let (Some(content), Some(page)) = (weak_content.upgrade(), weak_page.upgrade()) else {
+            return glib::ControlFlow::Break;
+        };
+        let orientation = if page.width() < 700 {
+            gtk::Orientation::Vertical
+        } else {
+            gtk::Orientation::Horizontal
+        };
+        if content.orientation() != orientation {
+            content.set_orientation(orientation);
+        }
+        glib::ControlFlow::Continue
+    });
     let entries: Rc<RefCell<Vec<FileItem>>> = Rc::new(RefCell::new(Vec::new()));
     let filter = gtk::SearchEntry::new();
     filter.set_placeholder_text(Some("FILTER CURRENT DIRECTORY"));
@@ -961,8 +1442,12 @@ fn files_page(window: &gtk::ApplicationWindow) -> gtk::Box {
     let o = open.clone();
     let t = trash.clone();
     list.connect_row_selected(move |_, r| {
+        update_preview(None);
         if let Some(item) = r.and_then(|r| es.borrow().get(r.index() as usize).cloned()) {
             metadata.set_text(&item.details);
+            if !item.directory {
+                update_preview(Some(item.path.clone()));
+            }
             o.set_sensitive(true);
             t.set_sensitive(true);
         } else {

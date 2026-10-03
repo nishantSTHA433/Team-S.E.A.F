@@ -108,3 +108,19 @@ textview, textview text { background:#000; color:#beaad9; }
 .directory row:selected .file-row, .directory row:selected .muted { color:#000; }
 progressbar trough, progressbar progress { border-radius:0; }
 .directory { border-radius:0; border-left:3px solid #a299d3; }
+
+/* Use the installed condensed face for reference-style headings. */
+.brand, .hero, .page-title, .instrument-title, .metric, .console-clock {
+  font-family:"Nimbus Sans Narrow", "Liberation Sans", sans-serif;
+}
+.brand { font-size:34px; letter-spacing:0; }
+.hero { font-size:36px; }
+.preview-panel { border-bottom:2px solid #c395c6; padding-bottom:10px; }
+
+.workspace-frame { background:#000; border:1px solid #a299d3; }
+.workspace-title { background:#cd747d; border-bottom:3px solid #000; }
+.workspace-title .compact { background:#ffcb64; }
+
+.workspace-frame { background:rgba(0,0,0,0.78); }
+.workspace-frame .metric { font-size:24px; }
+.workspace-frame .telemetry-panel { padding-bottom:6px; }
