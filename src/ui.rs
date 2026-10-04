@@ -299,7 +299,9 @@ pub fn build(app: &gtk::Application) {
     workspace_toggle.set_active(preferences.borrow().workspace_mode);
     settings.prepend(&workspace_toggle);
     stack.add_named(&scrolled(&settings), Some("settings"));
-    let (page_host, navigate_panel, set_mode) = console::build(&stack, &preferences);
+    let console_data = Rc::new(RefCell::new(console::InstrumentData::default()));
+    let (page_host, navigate_panel, set_mode) =
+        console::build(&stack, &preferences, console_data.clone());
     let mode_result = label("", "muted");
     settings.append(&mode_result);
     let cfg = preferences.clone();
@@ -516,6 +518,7 @@ pub fn build(app: &gtk::Application) {
         compact_hero
             .set_visible(!adaptive_prefs.borrow().workspace_mode || available_height >= 440);
         while let Ok(s) = rx.try_recv() {
+            console_data.borrow_mut().update(&s);
             last_update = std::time::Instant::now();
             {
                 let mut samples = history.borrow_mut();

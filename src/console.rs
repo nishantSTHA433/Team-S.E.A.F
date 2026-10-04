@@ -5,6 +5,196 @@ use serde::{Deserialize, Serialize};
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
+#[derive(Default)]
+pub(super) struct InstrumentData {
+    snapshot: Option<services::Snapshot>,
+    history: std::collections::VecDeque<f64>,
+    updated: Option<std::time::Instant>,
+}
+impl InstrumentData {
+    pub(super) fn update(&mut self, snapshot: &services::Snapshot) {
+        self.snapshot = Some(snapshot.clone());
+        self.updated = Some(std::time::Instant::now());
+        if self.history.len() == 60 {
+            self.history.pop_front();
+        }
+        self.history.push_back(snapshot.cpu.clamp(0.0, 100.0));
+    }
+}
+fn system_instrument(data: Rc<RefCell<InstrumentData>>) -> gtk::DrawingArea {
+    let instrument = gtk::DrawingArea::new();
+    instrument.set_can_target(false);
+    instrument.set_draw_func(move |_, cr, width, height| {
+        let scale = (width as f64 / 320.0).min(height as f64 / 200.0);
+        let _ = cr.save();
+        cr.scale(scale, scale);
+        let coral = (0.80, 0.45, 0.49);
+        let lavender = (0.66, 0.61, 0.83);
+        let amber = (1.0, 0.77, 0.34);
+        let text = |x: f64, y: f64, size: f64, content: &str, color: (f64, f64, f64)| {
+            cr.set_source_rgb(color.0, color.1, color.2);
+            cr.select_font_face(
+                "Nimbus Sans Narrow",
+                gtk::cairo::FontSlant::Normal,
+                gtk::cairo::FontWeight::Bold,
+            );
+            cr.set_font_size(size);
+            cr.move_to(x, y);
+            let _ = cr.show_text(content);
+        };
+        // The clock and instrumentation are drawn at the overview's actual size.
+        cr.set_source_rgb(lavender.0, lavender.1, lavender.2);
+        cr.rectangle(0.0, 0.0, 29.0, 44.0);
+        let _ = cr.fill();
+        text(7.0, 18.0, 12.0, "047", (0.0, 0.0, 0.0));
+        text(7.0, 35.0, 11.0, "SYS", (0.0, 0.0, 0.0));
+        let now = glib::DateTime::now_local().ok();
+        let clock = now
+            .as_ref()
+            .and_then(|d| d.format("%H:%M:%S").ok())
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "--:--:--".into());
+        let date = now
+            .as_ref()
+            .and_then(|d| d.format("%d.%m.%Y").ok())
+            .map(|v| v.to_string())
+            .unwrap_or_default();
+        text(40.0, 35.0, 35.0, &clock, amber);
+        text(202.0, 16.0, 12.0, "LCARS TIME / SYSTEM 01", amber);
+        text(202.0, 35.0, 16.0, &date, coral);
+        for (x, w, color) in [
+            (0.0, 28.0, lavender),
+            (32.0, 138.0, coral),
+            (174.0, 88.0, lavender),
+            (266.0, 54.0, amber),
+        ] {
+            cr.set_source_rgb(color.0, color.1, color.2);
+            cr.rectangle(x, 48.0, w, 5.0);
+            let _ = cr.fill();
+        }
+        cr.set_source_rgb(coral.0, coral.1, coral.2);
+        cr.rectangle(0.0, 60.0, 28.0, 137.0);
+        let _ = cr.fill();
+        text(5.0, 78.0, 10.0, "CORE", (0.0, 0.0, 0.0));
+        let data = data.borrow();
+        let Some(s) = data.snapshot.as_ref() else {
+            text(40.0, 93.0, 20.0, "ACQUIRING TELEMETRY", lavender);
+            let _ = cr.restore();
+            return;
+        };
+        let stale = data.updated.is_none_or(|t| t.elapsed().as_secs() > 20);
+        text(
+            40.0,
+            70.0,
+            12.0,
+            if stale {
+                "TELEMETRY STALE"
+            } else {
+                "FEDORA / LIVE CPU HISTORY"
+            },
+            coral,
+        );
+        cr.set_source_rgb(0.20, 0.17, 0.27);
+        cr.set_line_width(0.5);
+        for i in 0..=4 {
+            let y = 79.0 + i as f64 * 8.0;
+            cr.move_to(40.0, y);
+            cr.line_to(199.0, y);
+        }
+        let _ = cr.stroke();
+        cr.set_source_rgb(0.79, 0.77, 0.85);
+        cr.set_line_width(1.0);
+        for (i, value) in data.history.iter().enumerate() {
+            let x = 40.0 + (60 - data.history.len() + i) as f64 * 159.0 / 59.0;
+            let y = 111.0 - value * 0.32;
+            if i == 0 {
+                cr.move_to(x, y)
+            } else {
+                cr.line_to(x, y)
+            }
+        }
+        let _ = cr.stroke();
+        text(213.0, 76.0, 11.0, "UPTIME", coral);
+        text(
+            213.0,
+            94.0,
+            18.0,
+            &format!("{:02}h {:02}m", s.uptime / 3600, s.uptime % 3600 / 60),
+            amber,
+        );
+        let disk = s
+            .storage
+            .split_whitespace()
+            .last()
+            .and_then(|v| v.strip_suffix('%'))
+            .and_then(|v| v.parse::<f64>().ok());
+        let memory =
+            (s.memory_total > 0).then(|| s.memory_used as f64 / s.memory_total as f64 * 100.0);
+        for (i, (name, amount)) in [
+            ("CPU", (!s.error.contains("CPU")).then_some(s.cpu)),
+            ("RAM", memory),
+            ("HOME", disk),
+        ]
+        .iter()
+        .enumerate()
+        {
+            let x = 43.0 + i as f64 * 53.0;
+            text(
+                x,
+                129.0,
+                13.0,
+                &amount
+                    .map(|v| format!("{v:.0}%"))
+                    .unwrap_or_else(|| "--".into()),
+                lavender,
+            );
+            cr.set_source_rgb(coral.0, coral.1, coral.2);
+            cr.set_line_width(0.8);
+            cr.rectangle(x, 136.0, 20.0, 43.0);
+            let _ = cr.stroke();
+            if let Some(amount) = amount {
+                let fill = amount.clamp(0.0, 100.0) * 0.41;
+                cr.set_source_rgb(
+                    if i == 0 { amber.0 } else { coral.0 },
+                    if i == 0 { amber.1 } else { coral.1 },
+                    if i == 0 { amber.2 } else { coral.2 },
+                );
+                cr.rectangle(x + 1.0, 178.0 - fill, 18.0, fill);
+                let _ = cr.fill();
+            }
+            text(x, 194.0, 13.0, name, amber);
+        }
+        text(213.0, 125.0, 11.0, "RECEIVE / KiB/s", coral);
+        text(
+            213.0,
+            145.0,
+            20.0,
+            &format!("{:.1}", s.received as f64 / 1024.0),
+            amber,
+        );
+        text(213.0, 164.0, 11.0, "TRANSMIT / KiB/s", coral);
+        text(
+            213.0,
+            187.0,
+            20.0,
+            &format!("{:.1}", s.transmitted as f64 / 1024.0),
+            amber,
+        );
+        let _ = cr.restore();
+    });
+    let weak = instrument.downgrade();
+    glib::timeout_add_local(std::time::Duration::from_secs(1), move || {
+        let Some(widget) = weak.upgrade() else {
+            return glib::ControlFlow::Break;
+        };
+        if widget.is_visible() {
+            widget.queue_draw();
+        }
+        glib::ControlFlow::Continue
+    });
+    instrument
+}
+
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 struct Region {
     x: f64,
@@ -116,6 +306,7 @@ struct Surface {
     active: Cell<bool>,
     dimensions: Cell<(i32, i32)>,
     status: gtk::Label,
+    system_instrument: gtk::DrawingArea,
 }
 impl Surface {
     fn persist(&self) {
@@ -153,6 +344,12 @@ impl Surface {
             let content_h = (h - 52).max(1);
             let raw_w = if focus.is_some() { w } else { 960 };
             let raw_h = if focus.is_some() { content_h } else { 640 };
+            let overview_instrument = i == 0 && focus.is_none();
+            self.pages[i].set_visible(!overview_instrument);
+            if i == 0 {
+                self.system_instrument.set_visible(overview_instrument);
+                self.system_instrument.set_size_request(w, content_h);
+            }
             self.pages[i].set_size_request(raw_w, raw_h);
             self.pages[i].set_can_target(focus.is_some());
             self.pages[i].set_sensitive(focus.is_some());
@@ -199,6 +396,7 @@ impl Surface {
 pub(super) fn build(
     single: &gtk::Stack,
     _prefs: &Rc<RefCell<Preferences>>,
+    data: Rc<RefCell<InstrumentData>>,
 ) -> (gtk::Stack, Navigate, SetMode) {
     let host = gtk::Stack::new();
     host.set_hexpand(true);
@@ -297,6 +495,8 @@ pub(super) fn build(
         covers.push(cover);
         handles.push(handle);
     }
+    let system_instrument = system_instrument(data);
+    interiors[0].put(&system_instrument, 0.0, 0.0);
     let surface = Rc::new(Surface {
         shell,
         canvas,
@@ -315,6 +515,7 @@ pub(super) fn build(
         active: Cell::new(false),
         dimensions: Cell::new((0, 0)),
         status,
+        system_instrument,
     });
     let weak = Rc::downgrade(&surface);
     surface.background.set_draw_func(move |area, cr, w, h| {
@@ -556,6 +757,7 @@ pub(super) fn build(
             } else {
                 for (i, page) in s.pages.iter().enumerate() {
                     s.interiors[i].remove(page);
+                    page.set_visible(true);
                     page.set_size_request(-1, -1);
                     page.set_can_target(true);
                     page.set_sensitive(true);
