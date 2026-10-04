@@ -143,6 +143,108 @@ const PANELS: [(&str, &str); 6] = [
 #[path = "console.rs"]
 mod console;
 
+fn start_menu(navigate: Navigate) -> gtk::MenuButton {
+    let start = gtk::MenuButton::new();
+    start.set_label("LCARS / START");
+    start.set_direction(gtk::ArrowType::Up);
+    start.set_height_request(48);
+    start.add_css_class("start-button");
+    let popup = gtk::Popover::new();
+    popup.set_position(gtk::PositionType::Top);
+    popup.set_has_arrow(false);
+    popup.add_css_class("lcars-start-menu");
+    let panel = column(10);
+    panel.set_width_request(560);
+    panel.append(&label("LCARS / SYSTEM ACCESS 047", "page-title"));
+    let search = gtk::SearchEntry::new();
+    search.set_placeholder_text(Some("SEARCH INSTALLED APPLICATIONS"));
+    search.set_height_request(48);
+    panel.append(&search);
+    let content = row(12);
+    let applications = column(6);
+    applications.set_hexpand(true);
+    applications.append(&label("FEDORA APPLICATIONS", "instrument-title"));
+    let list = gtk::ListBox::new();
+    list.set_selection_mode(gtk::SelectionMode::None);
+    list.add_css_class("directory");
+    let report = label("Select a system or application.", "muted");
+    let mut apps = gio::AppInfo::all();
+    apps.retain(|app| app.should_show());
+    apps.sort_by_key(|app| app.display_name().to_lowercase());
+    let rows: Rc<Vec<(String, gtk::ListBoxRow)>> = Rc::new(
+        apps.into_iter()
+            .map(|app| {
+                let name = app.display_name().to_string();
+                let entry = button(&name, "start-app");
+                entry.set_hexpand(true);
+                entry.set_tooltip_text(app.description().as_deref());
+                if let Some(label) = entry.child().and_then(|w| w.downcast::<gtk::Label>().ok()) {
+                    label.set_xalign(0.0);
+                    label.set_ellipsize(gtk::pango::EllipsizeMode::End);
+                }
+                let weak_popup = popup.downgrade();
+                let report = report.clone();
+                entry.connect_clicked(move |_| {
+                    match app.launch(&[], None::<&gio::AppLaunchContext>) {
+                        Ok(()) => {
+                            report.set_text("Application launched.");
+                            if let Some(p) = weak_popup.upgrade() {
+                                p.popdown();
+                            }
+                        }
+                        Err(e) => report.set_text(&format!("Launch failed: {e}")),
+                    }
+                });
+                let r = gtk::ListBoxRow::new();
+                r.set_child(Some(&entry));
+                list.append(&r);
+                (name.to_lowercase(), r)
+            })
+            .collect(),
+    );
+    let app_scroll = scrolled(&list);
+    app_scroll.set_min_content_height(290);
+    app_scroll.set_max_content_height(330);
+    applications.append(&app_scroll);
+    let no_results = label("No matching applications.", "muted");
+    no_results.set_visible(rows.is_empty());
+    applications.append(&no_results);
+    search.connect_search_changed(move |search| {
+        let query = search.text().to_lowercase();
+        let mut matches = 0;
+        for (name, row) in rows.iter() {
+            let visible = name.contains(&query);
+            row.set_visible(visible);
+            if visible {
+                matches += 1;
+            }
+        }
+        no_results.set_visible(matches == 0);
+    });
+    content.append(&applications);
+    let systems = column(5);
+    systems.set_width_request(170);
+    systems.append(&label("CONSOLE SYSTEMS", "instrument-title"));
+    for (target, title) in PANELS {
+        let entry = button(title, "start-system");
+        let go = navigate.clone();
+        let weak_popup = popup.downgrade();
+        entry.connect_clicked(move |_| {
+            if let Some(p) = weak_popup.upgrade() {
+                p.popdown();
+            }
+            go(target);
+        });
+        systems.append(&entry);
+    }
+    content.append(&systems);
+    panel.append(&content);
+    panel.append(&report);
+    popup.set_child(Some(&panel));
+    start.set_popover(Some(&popup));
+    start
+}
+
 pub fn build(app: &gtk::Application) {
     let css = gtk::CssProvider::new();
     css.load_from_data(include_str!("../assets/lcars.css"));
@@ -198,10 +300,6 @@ pub fn build(app: &gtk::Application) {
     root.append(&gtk::WindowHandle::builder().child(&header).build());
     let body = row(0);
     body.set_vexpand(true);
-    let rail = column(3);
-    rail.add_css_class("rail");
-    rail.set_width_request(154);
-    rail.append(&label("47\nCOMMAND", "rail-cap"));
     let stack = gtk::Stack::new();
     stack.set_hexpand(true);
     stack.set_vexpand(true);
@@ -315,40 +413,6 @@ pub fn build(app: &gtk::Application) {
         });
     });
     set_mode(preferences.borrow().workspace_mode);
-    let nav_items = [
-        ("01  OVERVIEW", "dashboard"),
-        ("02  FILES", "files"),
-        ("03  NETWORK", "network"),
-        ("04  APPLICATIONS", "apps"),
-        ("05  UTILITIES", "tools"),
-        ("06  PREFERENCES", "settings"),
-    ];
-    let nav_buttons: Rc<RefCell<Vec<gtk::Button>>> = Rc::new(RefCell::new(Vec::new()));
-    for (text, name) in nav_items {
-        let b = button(text, "nav");
-        if name == "dashboard" {
-            b.add_css_class("selected");
-        }
-        let navigate = navigate_panel.clone();
-        let buttons = nav_buttons.clone();
-        b.connect_clicked(move |this| {
-            navigate(name);
-            for b in buttons.borrow().iter() {
-                b.remove_css_class("selected");
-            }
-            this.add_css_class("selected");
-        });
-        nav_buttons.borrow_mut().push(b.clone());
-        rail.append(&b);
-    }
-    let spacer = column(0);
-    spacer.set_vexpand(true);
-    rail.append(&spacer);
-    rail.append(&label(
-        "LOCAL SYSTEM\nFEDORA 38\nCONSOLE 0.2",
-        "rail-footer",
-    ));
-    body.append(&rail);
     body.append(&page_host);
     root.append(&body);
     let footer = row(12);
@@ -356,32 +420,18 @@ pub fn build(app: &gtk::Application) {
     let indicator = label("● CHECKING NETWORK", "status");
     indicator.set_hexpand(true);
     let clock = label("", "console-clock");
+    let start = start_menu(navigate_panel.clone());
+    footer.append(&start);
     for (title, target) in [
-        ("LCARS", "dashboard"),
+        ("SYSTEM", "dashboard"),
         ("FILES", "files"),
         ("NETWORK", "network"),
         ("TOOLS", "tools"),
     ] {
         let shortcut = button(title, "dock-button");
-        shortcut.set_height_request(32);
+        shortcut.set_height_request(48);
         let navigate = navigate_panel.clone();
-        let buttons = nav_buttons.clone();
-        shortcut.connect_clicked(move |_| {
-            navigate(target);
-            for b in buttons.borrow().iter() {
-                b.remove_css_class("selected");
-            }
-            let index = match target {
-                "dashboard" => 0,
-                "files" => 1,
-                "network" => 2,
-                "tools" => 4,
-                _ => 0,
-            };
-            if let Some(b) = buttons.borrow().get(index) {
-                b.add_css_class("selected");
-            }
-        });
+        shortcut.connect_clicked(move |_| navigate(target));
         footer.append(&shortcut);
     }
     footer.append(&indicator);
@@ -460,8 +510,12 @@ pub fn build(app: &gtk::Application) {
     let keys = gtk::EventControllerKey::new();
     let weak = window.downgrade();
     let shortcut_navigation = navigate_panel.clone();
-    let shortcut_buttons = nav_buttons.clone();
+    let start_popup = start.popover().expect("Start popover");
     keys.connect_key_pressed(move |_, key, _, modifiers| {
+        if key == gtk::gdk::Key::Escape && start_popup.is_visible() {
+            start_popup.popdown();
+            return glib::Propagation::Stop;
+        }
         if modifiers.contains(gtk::gdk::ModifierType::ALT_MASK) {
             let target = match key {
                 gtk::gdk::Key::_1 => Some("dashboard"),
@@ -474,13 +528,6 @@ pub fn build(app: &gtk::Application) {
             };
             if let Some(target) = target {
                 shortcut_navigation(target);
-                for (index, button) in shortcut_buttons.borrow().iter().enumerate() {
-                    if PANELS[index].0 == target {
-                        button.add_css_class("selected");
-                    } else {
-                        button.remove_css_class("selected");
-                    }
-                }
                 return glib::Propagation::Stop;
             }
         }
