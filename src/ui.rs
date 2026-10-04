@@ -191,6 +191,10 @@ pub fn build(app: &gtk::Application) {
         }
     });
     header.append(&quit);
+    let end_cap = column(0);
+    end_cap.add_css_class("header-end-cap");
+    end_cap.set_width_request(18);
+    header.append(&end_cap);
     root.append(&gtk::WindowHandle::builder().child(&header).build());
     let body = row(0);
     body.set_vexpand(true);

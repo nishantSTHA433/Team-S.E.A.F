@@ -135,3 +135,19 @@ progressbar trough, progressbar progress { border-radius:0; }
 .arrange-selected .system-band { background:#ffcb64; }
 
 .console-region scrolledwindow:disabled, .console-region scrolledwindow:disabled * { opacity:1; }
+
+/* Reference pass 7: thin visual bands inside full-height touch targets. */
+.system-band, .system-band:hover, .system-band:active,
+.arrange-selected .system-band { background:transparent; border-radius:0; padding:0; }
+.console-band-title { background:#cd747d; color:#000; min-height:24px; padding:0 9px; border-radius:13px 0 0 0; font-family:"Nimbus Sans Narrow",sans-serif; font-size:15px; font-weight:800; }
+.system-band:hover .console-band-title { background:#dfabb5; }
+.arrange-selected .console-band-title { background:#ffcb64; }
+.band-coral { background:#cd747d; }
+.band-lilac { background:#a299d3; }
+.band-amber { background:#ffcb64; border-radius:0 13px 13px 0; }
+.console-region { border-left:4px solid #c395c6; border-top-left-radius:20px; }
+.header-end-cap { background:#ffcb64; border-radius:0 24px 24px 0; margin:7px 0; }
+.rail-cap { font-family:"Nimbus Sans Narrow",sans-serif; font-size:24px; }
+.console-clock { font-size:20px; }
+.telemetry-panel { border-right:0; border-bottom:1px solid #574b6d; border-left:3px solid #a299d3; border-radius:0; }
+.instrument-title { border-radius:0; }

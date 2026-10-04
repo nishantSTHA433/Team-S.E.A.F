@@ -107,6 +107,7 @@ struct Surface {
     interiors: Vec<gtk::Fixed>,
     pages: Vec<gtk::Widget>,
     headings: Vec<gtk::Button>,
+    titles: Vec<gtk::Label>,
     covers: Vec<gtk::Button>,
     handles: Vec<gtk::Button>,
     focused: Cell<Option<usize>>,
@@ -167,7 +168,7 @@ impl Surface {
             );
             self.covers[i].set_visible(focus.is_none());
             self.handles[i].set_visible(self.arranging.get());
-            self.headings[i].set_label(&format!(
+            self.titles[i].set_text(&format!(
                 "{:02} / {}{}",
                 i + 1,
                 title,
@@ -244,6 +245,7 @@ pub(super) fn build(
     let mut tiles = Vec::new();
     let mut interiors = Vec::new();
     let mut headings = Vec::new();
+    let mut titles = Vec::new();
     let mut covers = Vec::new();
     let mut handles = Vec::new();
     for (_, title) in PANELS {
@@ -253,7 +255,22 @@ pub(super) fn build(
         let bounds = gtk::DrawingArea::new();
         tile.set_child(Some(&bounds));
         let body = column(4);
-        let heading = button(title, "system-band");
+        let heading = button("", "system-band");
+        let band = row(3);
+        band.set_valign(gtk::Align::Center);
+        let title_text = label(title, "console-band-title");
+        title_text.set_wrap(false);
+        title_text.set_ellipsize(gtk::pango::EllipsizeMode::End);
+        title_text.set_hexpand(true);
+        band.append(&title_text);
+        for class in ["band-coral", "band-lilac", "band-amber"] {
+            let segment = column(0);
+            segment.add_css_class(class);
+            segment.set_width_request(12);
+            band.append(&segment);
+        }
+        heading.set_child(Some(&band));
+        titles.push(title_text);
         body.append(&heading);
         let interior = gtk::Fixed::new();
         interior.set_hexpand(true);
@@ -289,6 +306,7 @@ pub(super) fn build(
         interiors,
         pages,
         headings,
+        titles,
         covers,
         handles,
         focused: Cell::new(None),
@@ -327,9 +345,32 @@ pub(super) fn build(
                 best.0 * w as f64 - size / 2.0,
                 best.1 * h as f64 - size / 2.0,
             );
-            cr.scale(size / 160.0, size / 160.0);
+            // Reserve the bottom quarter of the available gap for the reference status lockup.
+            cr.translate(size * 0.11, 0.0);
+            cr.scale(size * 0.78 / 160.0, size * 0.78 / 160.0);
             draw_emblem(area, cr, 160, 160);
             let _ = cr.restore();
+            if size >= 90.0 {
+                cr.select_font_face(
+                    "Nimbus Sans Narrow",
+                    gtk::cairo::FontSlant::Normal,
+                    gtk::cairo::FontWeight::Bold,
+                );
+                for (text, baseline, font_size, color) in [
+                    ("SYSTEM AVAILABLE", 0.88, 0.145, (0.70, 0.64, 0.89)),
+                    ("STATION ID 1440–900", 1.0, 0.085, (0.80, 0.45, 0.49)),
+                ] {
+                    cr.set_font_size(size * font_size);
+                    cr.set_source_rgb(color.0, color.1, color.2);
+                    if let Ok(extent) = cr.text_extents(text) {
+                        cr.move_to(
+                            best.0 * w as f64 - extent.width() / 2.0 - extent.x_bearing(),
+                            best.1 * h as f64 - size / 2.0 + size * baseline,
+                        );
+                        let _ = cr.show_text(text);
+                    }
+                }
+            }
         }
     });
     for index in 0..PANELS.len() {
