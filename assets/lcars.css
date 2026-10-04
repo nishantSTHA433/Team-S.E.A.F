@@ -124,3 +124,14 @@ progressbar trough, progressbar progress { border-radius:0; }
 .workspace-frame { background:rgba(0,0,0,0.78); }
 .workspace-frame .metric { font-size:24px; }
 .workspace-frame .telemetry-panel { padding-bottom:6px; }
+
+/* Touch console: open-sided LCARS regions, separate large controls from scaled previews. */
+.console-surface { background:#000; padding:8px; }
+.console-region { background:rgba(0,0,0,0.84); border:0; border-left:7px solid #c395c6; border-top-left-radius:30px; }
+.system-band { background:#cc747d; color:#000; border-radius:24px 0 24px 0; font-family:"Nimbus Sans Narrow",sans-serif; font-size:16px; padding:4px 12px; }
+.zoom-target, .zoom-target:hover, .zoom-target:active { background:transparent; border:0; padding:0; box-shadow:none; }
+.resize-handle { background:#ffcb64; color:#000; font-size:24px; border-radius:20px 0 0 0; }
+.arrange-selected { border-left-color:#ffcb64; }
+.arrange-selected .system-band { background:#ffcb64; }
+
+.console-region scrolledwindow:disabled, .console-region scrolledwindow:disabled * { opacity:1; }

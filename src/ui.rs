@@ -140,191 +140,8 @@ const PANELS: [(&str, &str); 6] = [
     ("settings", "PREFERENCES"),
 ];
 
-fn workspace(single: &gtk::Stack) -> (gtk::Stack, Navigate, SetMode) {
-    let host = gtk::Stack::new();
-    host.set_hexpand(true);
-    host.set_vexpand(true);
-    host.add_named(single, Some("single"));
-    let grid = gtk::Grid::builder()
-        .column_spacing(8)
-        .row_spacing(8)
-        .column_homogeneous(true)
-        .row_homogeneous(true)
-        .build();
-    grid.set_margin_start(10);
-    grid.set_margin_end(10);
-    grid.set_margin_top(10);
-    grid.set_margin_bottom(10);
-    let overlay = gtk::Overlay::new();
-    let background = gtk::DrawingArea::new();
-    background.set_hexpand(true);
-    background.set_vexpand(true);
-    let opened = Rc::new(RefCell::new(vec!["dashboard".to_owned()]));
-    let active = Rc::new(Cell::new(false));
-    let background_panels = opened.clone();
-    background.set_draw_func(move |area, cr, w, h| {
-        let count = background_panels.borrow().len();
-        let size = if count == 0 { 320.0 } else { 180.0 };
-        let x = if count == 0 {
-            (w as f64 - size) / 2.0
-        } else {
-            (w as f64 - size - 12.0).max(0.0)
-        };
-        let y = if count == 0 {
-            (h as f64 - size) / 2.0
-        } else {
-            (h as f64 - size - 12.0).max(0.0)
-        };
-        let _ = cr.save();
-        cr.translate(x, y);
-        cr.scale(size / 160.0, size / 160.0);
-        draw_emblem(area, cr, 160, 160);
-        let _ = cr.restore();
-    });
-    overlay.set_child(Some(&background));
-    let scroll = scrolled(&grid);
-    scroll.set_hexpand(true);
-    scroll.set_vexpand(true);
-    overlay.add_overlay(&scroll);
-    host.add_named(&overlay, Some("workspace"));
-    let pages: Rc<Vec<gtk::Widget>> = Rc::new(
-        PANELS
-            .iter()
-            .map(|(name, _)| single.child_by_name(name).expect("Registered page"))
-            .collect(),
-    );
-    let frames: Rc<Vec<gtk::Box>> = Rc::new(
-        PANELS
-            .iter()
-            .map(|(_, title)| {
-                let frame = column(0);
-                frame.add_css_class("workspace-frame");
-                frame.set_hexpand(true);
-                frame.set_vexpand(true);
-                let bar = row(4);
-                bar.add_css_class("workspace-title");
-                let name = label(title, "instrument-title");
-                name.set_hexpand(true);
-                bar.append(&name);
-                frame.append(&bar);
-                frame
-            })
-            .collect(),
-    );
-    let layout_key = Rc::new(Cell::new((0, 0, 0usize)));
-    let arrange: Rc<dyn Fn()> = {
-        let grid = grid.clone();
-        let frames = frames.clone();
-        let opened = opened.clone();
-        let background = background.clone();
-        let overlay = overlay.clone();
-        let layout_key = layout_key.clone();
-        Rc::new(move || {
-            while let Some(child) = grid.first_child() {
-                grid.remove(&child);
-            }
-            let names = opened.borrow();
-            let width = overlay.width();
-            let height = overlay.height();
-            let cols = if width >= 1150 && names.len() > 1 {
-                2
-            } else {
-                1
-            };
-            let rows = names.len().div_ceil(cols).max(1);
-            let panel_height = ((height - 20 - (rows as i32 - 1) * 8) / rows as i32).max(230);
-            for (i, name) in names.iter().enumerate() {
-                let index = PANELS
-                    .iter()
-                    .position(|(id, _)| id == name)
-                    .expect("Registered panel");
-                frames[index].set_height_request(panel_height);
-                grid.attach(&frames[index], (i % cols) as i32, (i / cols) as i32, 1, 1);
-            }
-            layout_key.set((width, height, names.len()));
-            background.queue_draw();
-        })
-    };
-    for (index, frame) in frames.iter().enumerate() {
-        let bar = frame.first_child().unwrap().downcast::<gtk::Box>().unwrap();
-        let close = button("CLOSE", "compact");
-        close.set_height_request(36);
-        let opened = opened.clone();
-        let arrange = arrange.clone();
-        close.connect_clicked(move |_| {
-            opened.borrow_mut().retain(|name| name != PANELS[index].0);
-            arrange();
-        });
-        bar.append(&close);
-    }
-    let navigate: Navigate = {
-        let single = single.clone();
-        let active = active.clone();
-        let opened = opened.clone();
-        let arrange = arrange.clone();
-        Rc::new(move |name| {
-            if active.get() {
-                if !opened.borrow().iter().any(|s| s == name) {
-                    opened.borrow_mut().push(name.to_owned());
-                }
-                arrange();
-            } else {
-                single.set_visible_child_name(name);
-            }
-        })
-    };
-    let set_mode: SetMode = {
-        let single = single.clone();
-        let host = host.clone();
-        let frames = frames.clone();
-        let pages = pages.clone();
-        let active = active.clone();
-        let arrange = arrange.clone();
-        let opened = opened.clone();
-        Rc::new(move |enabled| {
-            if enabled == active.get() {
-                return;
-            }
-            if enabled {
-                if let Some(name) = single.visible_child_name() {
-                    if !opened.borrow().iter().any(|s| s == name.as_str()) {
-                        opened.borrow_mut().push(name.to_string());
-                    }
-                }
-                for (page, frame) in pages.iter().zip(frames.iter()) {
-                    single.remove(page);
-                    if let Ok(scroll) = page.clone().downcast::<gtk::ScrolledWindow>() {
-                        scroll.set_hscrollbar_policy(gtk::PolicyType::Automatic);
-                    }
-                    frame.append(page);
-                }
-                active.set(true);
-                host.set_visible_child_name("workspace");
-                arrange();
-            } else {
-                for (i, (page, frame)) in pages.iter().zip(frames.iter()).enumerate() {
-                    frame.remove(page);
-                    single.add_named(page, Some(PANELS[i].0));
-                }
-                active.set(false);
-                host.set_visible_child_name("single");
-                single.set_visible_child_name("settings");
-            }
-        })
-    };
-    let weak_overlay = overlay.downgrade();
-    overlay.add_tick_callback(move |_, _| {
-        let Some(overlay) = weak_overlay.upgrade() else {
-            return glib::ControlFlow::Break;
-        };
-        let key = (overlay.width(), overlay.height(), opened.borrow().len());
-        if active.get() && key != layout_key.get() {
-            arrange();
-        }
-        glib::ControlFlow::Continue
-    });
-    (host, navigate, set_mode)
-}
+#[path = "console.rs"]
+mod console;
 
 pub fn build(app: &gtk::Application) {
     let css = gtk::CssProvider::new();
@@ -472,14 +289,13 @@ pub fn build(app: &gtk::Application) {
     stack.add_named(&scrolled(&applications_page()), Some("apps"));
     stack.add_named(&scrolled(&crate::tools::page()), Some("tools"));
     let settings = settings_page(&preferences);
-    let workspace_toggle = gtk::CheckButton::with_label(
-        "WORKSPACE MODE — open tools together (off: single-page navigation)",
-    );
+    let workspace_toggle =
+        gtk::CheckButton::with_label("CONSOLE MODE — touch / zoom / arrange (off: Desktop mode)");
     workspace_toggle.set_height_request(48);
     workspace_toggle.set_active(preferences.borrow().workspace_mode);
     settings.prepend(&workspace_toggle);
     stack.add_named(&scrolled(&settings), Some("settings"));
-    let (page_host, navigate_panel, set_mode) = workspace(&stack);
+    let (page_host, navigate_panel, set_mode) = console::build(&stack, &preferences);
     let mode_result = label("", "muted");
     settings.append(&mode_result);
     let cfg = preferences.clone();
