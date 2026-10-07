@@ -225,65 +225,156 @@ impl Region {
         .bounded()
     }
 }
+// Equal-sized slots reserve the center for the ship emblem.
+fn automatic(visible: &[usize]) -> Vec<Region> {
+    let mut result = vec![
+        Region {
+            x: 0.0,
+            y: 0.0,
+            w: 0.31,
+            h: 0.36
+        };
+        PANELS.len()
+    ];
+    let rect = |x, y, w, h| Region { x, y, w, h };
+    let slots = match visible.len() {
+        0 => vec![],
+        1 => vec![rect(0.0, 0.0, 0.64, 1.0)],
+        2 => vec![rect(0.0, 0.0, 0.39, 1.0), rect(0.61, 0.0, 0.39, 1.0)],
+        3 => vec![
+            rect(0.0, 0.0, 0.286, 1.0),
+            rect(0.714, 0.0, 0.286, 1.0),
+            rect(0.300, 0.0, 0.4, 0.492),
+        ],
+        4 => vec![
+            rect(0.0, 0.0, 0.33, 0.492),
+            rect(0.67, 0.0, 0.33, 0.492),
+            rect(0.67, 0.508, 0.33, 0.492),
+            rect(0.0, 0.508, 0.33, 0.492),
+        ],
+        5 => vec![
+            rect(0.0, 0.0, 0.286, 0.492),
+            rect(0.714, 0.0, 0.286, 0.492),
+            rect(0.714, 0.508, 0.286, 0.492),
+            rect(0.0, 0.508, 0.286, 0.492),
+            rect(0.300, 0.0, 0.4, 0.492),
+        ],
+        _ => vec![
+            rect(0.0, 0.0, 0.286, 0.492),
+            rect(0.714, 0.0, 0.286, 0.492),
+            rect(0.714, 0.508, 0.286, 0.492),
+            rect(0.0, 0.508, 0.286, 0.492),
+            rect(0.300, 0.0, 0.4, 0.35),
+            rect(0.300, 0.65, 0.4, 0.35),
+        ],
+    };
+    for (&index, region) in visible.iter().zip(slots) {
+        result[index] = region;
+    }
+    result
+}
 fn defaults() -> Vec<Region> {
-    vec![
-        Region {
-            x: 0.0,
-            y: 0.0,
-            w: 0.30,
-            h: 0.44,
-        },
-        Region {
-            x: 0.65,
-            y: 0.0,
-            w: 0.35,
-            h: 0.46,
-        },
-        Region {
-            x: 0.65,
-            y: 0.51,
-            w: 0.35,
-            h: 0.46,
-        },
-        Region {
-            x: 0.0,
-            y: 0.51,
-            w: 0.30,
-            h: 0.46,
-        },
-        Region {
-            x: 0.33,
-            y: 0.0,
-            w: 0.29,
-            h: 0.27,
-        },
-        Region {
-            x: 0.33,
-            y: 0.72,
-            w: 0.29,
-            h: 0.25,
-        },
-    ]
+    automatic(&(0..PANELS.len()).collect::<Vec<_>>())
+}
+fn interpolate(a: Region, b: Region, t: f64) -> Region {
+    let mix = |a: f64, b: f64| a + (b - a) * t;
+    Region {
+        x: mix(a.x, b.x),
+        y: mix(a.y, b.y),
+        w: mix(a.w, b.w),
+        h: mix(a.h, b.h),
+    }
+}
+fn drop_target(
+    regions: &[Region],
+    hidden: &[bool],
+    source: usize,
+    x: f64,
+    y: f64,
+) -> Option<usize> {
+    regions.iter().enumerate().rev().find_map(|(i, r)| {
+        (i != source && !hidden[i] && x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h)
+            .then_some(i)
+    })
+}
+fn logo_region(regions: &[Region]) -> Region {
+    let mut xs = vec![0.0, 1.0];
+    let mut ys = vec![0.0, 1.0];
+    for r in regions {
+        xs.extend([r.x, r.x + r.w]);
+        ys.extend([r.y, r.y + r.h]);
+    }
+    xs.sort_by(f64::total_cmp);
+    xs.dedup();
+    ys.sort_by(f64::total_cmp);
+    ys.dedup();
+    let mut best = Region {
+        x: 0.5,
+        y: 0.5,
+        w: 0.0,
+        h: 0.0,
+    };
+    let mut score = 0.0;
+    for (a, &x) in xs.iter().enumerate() {
+        for &right in &xs[a + 1..] {
+            for (b, &y) in ys.iter().enumerate() {
+                for &bottom in &ys[b + 1..] {
+                    if regions.iter().any(|r| {
+                        x < r.x + r.w - 0.00001
+                            && right > r.x + 0.00001
+                            && y < r.y + r.h - 0.00001
+                            && bottom > r.y + 0.00001
+                    }) {
+                        continue;
+                    }
+                    let w = right - x;
+                    let h = bottom - y;
+                    let candidate = w * h
+                        / (1.0 + ((x + w / 2.0 - 0.5).powi(2) + (y + h / 2.0 - 0.5).powi(2)) * 2.0);
+                    if candidate > score {
+                        score = candidate;
+                        best = Region { x, y, w, h };
+                    }
+                }
+            }
+        }
+    }
+    best
 }
 fn layout_path() -> std::path::PathBuf {
     std::env::var_os("XDG_CONFIG_HOME")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| services::home().join(".config"))
-        .join("lcars-desktop/console-layout.json")
+        .join("lcars-desktop/console-layout-v2.json")
 }
-fn load() -> Vec<Region> {
+#[derive(Serialize, Deserialize)]
+struct SavedLayout {
+    regions: Vec<Region>,
+    hidden: Vec<bool>,
+}
+fn load() -> SavedLayout {
     std::fs::read(layout_path())
         .ok()
-        .and_then(|b| serde_json::from_slice::<Vec<Region>>(&b).ok())
-        .filter(|v| v.len() == PANELS.len())
-        .map(|v| v.into_iter().map(Region::bounded).collect())
-        .unwrap_or_else(defaults)
+        .and_then(|b| serde_json::from_slice::<SavedLayout>(&b).ok())
+        .filter(|v| v.regions.len() == PANELS.len() && v.hidden.len() == PANELS.len())
+        .map(|v| SavedLayout {
+            regions: v.regions.into_iter().map(Region::bounded).collect(),
+            hidden: v.hidden,
+        })
+        .unwrap_or_else(|| SavedLayout {
+            regions: defaults(),
+            hidden: vec![false; PANELS.len()],
+        })
 }
-fn save(regions: &[Region]) -> Result<(), String> {
+fn save(regions: &[Region], hidden: &[bool]) -> Result<(), String> {
     let path = layout_path();
     std::fs::create_dir_all(path.parent().ok_or("Missing configuration directory")?)
         .map_err(|e| e.to_string())?;
-    let bytes = serde_json::to_vec_pretty(regions).map_err(|e| e.to_string())?;
+    let bytes = serde_json::to_vec_pretty(&SavedLayout {
+        regions: regions.to_vec(),
+        hidden: hidden.to_vec(),
+    })
+    .map_err(|e| e.to_string())?;
     let temp = path.with_extension("tmp");
     std::fs::write(&temp, bytes).map_err(|e| e.to_string())?;
     std::fs::rename(temp, path).map_err(|e| e.to_string())
@@ -307,43 +398,136 @@ struct Surface {
     dimensions: Cell<(i32, i32)>,
     status: gtk::Label,
     system_instrument: gtk::DrawingArea,
+    maximizers: Vec<gtk::Button>,
+    minimizers: Vec<gtk::Button>,
+    advanced: Cell<bool>,
+    hidden: RefCell<Vec<bool>>,
+    shown: RefCell<Vec<Region>>,
+    transition: RefCell<Option<(std::time::Instant, Vec<Region>)>>,
+    mode_picker: gtk::DropDown,
+    edits: gtk::Box,
+    arrange_button: gtk::Button,
+    command: gtk::Box,
+    swap_source: Cell<Option<usize>>,
+    drop_hover: Cell<Option<usize>>,
 }
 impl Surface {
     fn persist(&self) {
-        self.status.set_text(&match save(&self.regions.borrow()) {
-            Ok(()) => "ARRANGEMENT SAVED".into(),
-            Err(e) => format!("SAVE FAILED / {e}"),
+        self.status
+            .set_text(&match save(&self.regions.borrow(), &self.hidden.borrow()) {
+                Ok(()) => "ARRANGEMENT SAVED".into(),
+                Err(e) => format!("SAVE FAILED / {e}"),
+            });
+    }
+    fn toggle_arrange(&self) {
+        let on = !self.arranging.get();
+        self.arranging.set(on);
+        self.focused.set(None);
+        self.advanced.set(false);
+        self.mode_picker.set_selected(0);
+        self.swap_source.set(None);
+        self.sync_controls();
+        self.status.set_text(if on {
+            "BASIC / DRAG ONTO ANOTHER SYSTEM TO SWAP"
+        } else {
+            "HOME / TOUCH A SYSTEM TO ZOOM IN"
         });
+        if !on {
+            self.persist();
+        }
+        self.animate();
+    }
+    fn home(&self) {
+        self.focused.set(None);
+        self.arranging.set(false);
+        self.sync_controls();
+        self.status.set_text("HOME / TOUCH A SYSTEM TO ZOOM IN");
+        self.animate();
+    }
+    fn sync_controls(&self) {
+        let arranging = self.arranging.get();
+        self.command.set_visible(arranging);
+        self.mode_picker.set_visible(arranging);
+        self.edits.set_visible(arranging && self.advanced.get());
+        self.arrange_button
+            .set_label(if arranging { "DONE" } else { "ARRANGE" });
+    }
+    fn animate(&self) {
+        *self.transition.borrow_mut() =
+            Some((std::time::Instant::now(), self.shown.borrow().clone()));
+        self.layout();
+    }
+    fn reflow(&self) {
+        let visible = (0..PANELS.len())
+            .filter(|&i| !self.hidden.borrow()[i])
+            .collect::<Vec<_>>();
+        *self.regions.borrow_mut() = automatic(&visible);
+    }
+    fn maximize(&self, index: usize) {
+        self.hidden.borrow_mut()[index] = false;
+        self.arranging.set(false);
+        self.sync_controls();
+        self.focused.set(Some(index));
+        self.status
+            .set_text("FOCUSED / TOUCH THE TITLE AGAIN TO RETURN HOME");
+        self.animate();
+    }
+    fn minimize(&self, index: usize) {
+        self.hidden.borrow_mut()[index] = true;
+        self.focused.set(None);
+        self.swap_source.set(None);
+        self.reflow();
+        self.persist();
+        self.status
+            .set_text("MINIMIZED / REOPEN FROM START OR THE TASKBAR");
+        self.animate();
     }
     fn layout(&self) {
         let width = self.shell.width().max(1) as f64;
         let height = self.shell.height().max(1) as f64;
         self.dimensions.set((width as i32, height as i32));
         let focus = self.focused.get();
+        let transition = self.transition.borrow().clone();
+        let progress = transition.as_ref().map_or(1.0, |(start, _)| {
+            (start.elapsed().as_secs_f64() / 0.30).min(1.0)
+        });
+        let ease = progress * progress * (3.0 - 2.0 * progress);
         for (i, (_, title)) in PANELS.iter().enumerate() {
-            let r = if let Some(f) = focus {
-                if i == f {
-                    Region {
-                        x: 0.0,
-                        y: 0.0,
-                        w: 1.0,
-                        h: 1.0,
-                    }
-                } else {
-                    self.tiles[i].set_visible(false);
-                    continue;
+            let visible = !self.hidden.borrow()[i] && focus.is_none_or(|f| i == f);
+            self.tiles[i].set_visible(visible);
+            self.tiles[i].set_can_target(visible);
+            if !visible {
+                continue;
+            }
+            let target = if focus == Some(i) {
+                Region {
+                    x: 0.0,
+                    y: 0.0,
+                    w: 1.0,
+                    h: 1.0,
                 }
             } else {
                 self.regions.borrow()[i]
             };
-            self.tiles[i].set_visible(true);
-            let w = (r.w * width - 6.0).max(120.0) as i32;
-            let h = (r.h * height - 6.0).max(105.0) as i32;
+            let r = transition
+                .as_ref()
+                .map_or(target, |(_, from)| interpolate(from[i], target, ease));
+            self.shown.borrow_mut()[i] = r;
+            let w = (r.w * width - 6.0).max(100.0) as i32;
+            let h = (r.h * height - 6.0).max(80.0) as i32;
             self.tiles[i].set_size_request(w, h);
             self.canvas.move_(&self.tiles[i], r.x * width, r.y * height);
             let content_h = (h - 52).max(1);
-            let raw_w = if focus.is_some() { w } else { 960 };
-            let raw_h = if focus.is_some() { content_h } else { 640 };
+            let raw_w = if focus.is_some() {
+                (width - 6.0) as i32
+            } else {
+                960
+            };
+            let raw_h = if focus.is_some() {
+                (height - 58.0).max(1.0) as i32
+            } else {
+                ((960.0 * content_h as f64 / w as f64) as i32).max(1)
+            };
             let overview_instrument = i == 0 && focus.is_none();
             self.pages[i].set_visible(!overview_instrument);
             if i == 0 {
@@ -351,45 +535,60 @@ impl Surface {
                 self.system_instrument.set_size_request(w, content_h);
             }
             self.pages[i].set_size_request(raw_w, raw_h);
-            self.pages[i].set_can_target(focus.is_some());
-            self.pages[i].set_sensitive(focus.is_some());
-            self.pages[i].set_focusable(focus.is_some());
-            let scale = if focus.is_some() {
-                1.0
-            } else {
-                (w as f32 / 960.0).min(content_h as f32 / 640.0)
-            };
+            let interactive = focus == Some(i) && progress >= 1.0;
+            self.pages[i].set_can_target(interactive);
+            self.pages[i].set_sensitive(interactive);
+            self.pages[i].set_focusable(interactive);
+            let scale = (w as f32 / raw_w as f32).min(content_h as f32 / raw_h as f32);
             self.interiors[i].set_child_transform(
                 &self.pages[i],
                 Some(&gtk::gsk::Transform::new().scale(scale, scale)),
             );
             self.covers[i].set_visible(focus.is_none());
-            self.handles[i].set_visible(self.arranging.get());
-            self.titles[i].set_text(&format!(
-                "{:02} / {}{}",
-                i + 1,
-                title,
-                if self.arranging.get() { " / MOVE" } else { "" }
-            ));
-            if self.arranging.get() && self.selected.get() == i {
+            self.handles[i].set_visible(self.arranging.get() && self.advanced.get());
+            self.maximizers[i].set_sensitive(!self.arranging.get());
+            self.minimizers[i].set_sensitive(!self.arranging.get());
+            self.titles[i].set_text(&format!("{:02} / {}", i + 1, title));
+            if (self.arranging.get() && self.selected.get() == i)
+                || self.drop_hover.get() == Some(i)
+            {
                 self.tiles[i].add_css_class("arrange-selected");
             } else {
                 self.tiles[i].remove_css_class("arrange-selected");
             }
         }
+        if progress >= 1.0 {
+            self.transition.borrow_mut().take();
+        }
         self.background.queue_draw();
     }
     fn choose(&self, index: usize) {
         self.selected.set(index);
-        if !self.arranging.get() {
-            self.focused.set(Some(index));
-        }
-        self.status.set_text(if self.arranging.get() {
-            "DRAG THE TITLE / DRAG ↘ TO RESIZE"
+        if self.arranging.get() {
+            if !self.advanced.get() {
+                if let Some(from) = self.swap_source.take() {
+                    if from != index {
+                        self.regions.borrow_mut().swap(from, index);
+                        self.persist();
+                        self.animate();
+                    }
+                } else {
+                    self.swap_source.set(Some(index));
+                    self.status
+                        .set_text("TOUCH ANOTHER SYSTEM TO SWAP / OR DRAG AND DROP");
+                }
+            }
+            self.layout();
+        } else if self.focused.get() == Some(index) {
+            self.home();
         } else {
-            "SYSTEM FOCUSED / OVERVIEW TO ZOOM OUT"
-        });
-        self.layout();
+            if self.hidden.borrow()[index] {
+                self.hidden.borrow_mut()[index] = false;
+                self.reflow();
+                self.persist();
+            }
+            self.maximize(index);
+        }
     }
 }
 
@@ -405,12 +604,18 @@ pub(super) fn build(
     let console = column(6);
     console.add_css_class("console-surface");
     let command = row(6);
+    command.set_visible(false);
     let overview = button("ALL SYSTEMS", "primary");
     let arrange = button("ARRANGE", "secondary");
     let auto = button("AUTO FIT", "secondary");
     command.append(&overview);
     command.append(&arrange);
     command.append(&auto);
+    let mode_picker = gtk::DropDown::from_strings(&["BASIC", "ADVANCED"]);
+    mode_picker.set_height_request(48);
+    mode_picker.add_css_class("arrange-mode");
+    mode_picker.set_visible(false);
+    command.append(&mode_picker);
     let status = label("TAP A SYSTEM TO ZOOM IN", "muted");
     status.set_hexpand(true);
     command.append(&status);
@@ -446,6 +651,8 @@ pub(super) fn build(
     let mut titles = Vec::new();
     let mut covers = Vec::new();
     let mut handles = Vec::new();
+    let mut maximizers = Vec::new();
+    let mut minimizers = Vec::new();
     for (_, title) in PANELS {
         let tile = gtk::Overlay::new();
         tile.add_css_class("console-region");
@@ -454,22 +661,42 @@ pub(super) fn build(
         tile.set_child(Some(&bounds));
         let body = column(4);
         let heading = button("", "system-band");
-        let band = row(3);
-        band.set_valign(gtk::Align::Center);
+        heading.set_hexpand(true);
+        heading.set_height_request(48);
         let title_text = label(title, "console-band-title");
+        title_text.set_valign(gtk::Align::Center);
         title_text.set_wrap(false);
         title_text.set_ellipsize(gtk::pango::EllipsizeMode::End);
-        title_text.set_hexpand(true);
-        band.append(&title_text);
-        for class in ["band-coral", "band-lilac", "band-amber"] {
-            let segment = column(0);
-            segment.add_css_class(class);
-            segment.set_width_request(12);
-            band.append(&segment);
+        heading.set_child(Some(&title_text));
+        let band = row(3);
+        band.append(&heading);
+        for (icon, class, tip, collection) in [
+            (
+                "□",
+                "window-maximize",
+                "Maximize this system",
+                &mut maximizers,
+            ),
+            (
+                "−",
+                "window-minimize",
+                "Minimize / reopen from Start",
+                &mut minimizers,
+            ),
+        ] {
+            let control = button(icon, class);
+            control.set_size_request(44, 48);
+            let glyph = label(icon, "window-glyph");
+            glyph.set_valign(gtk::Align::Center);
+            glyph.set_justify(gtk::Justification::Center);
+            glyph.set_xalign(0.5);
+            control.set_child(Some(&glyph));
+            control.set_tooltip_text(Some(tip));
+            band.append(&control);
+            collection.push(control);
         }
-        heading.set_child(Some(&band));
         titles.push(title_text);
-        body.append(&heading);
+        body.append(&band);
         let interior = gtk::Fixed::new();
         interior.set_hexpand(true);
         interior.set_vexpand(true);
@@ -497,11 +724,13 @@ pub(super) fn build(
     }
     let system_instrument = system_instrument(data);
     interiors[0].put(&system_instrument, 0.0, 0.0);
+    let saved = load();
     let surface = Rc::new(Surface {
         shell,
         canvas,
         background,
-        regions: RefCell::new(load()),
+        regions: RefCell::new(saved.regions.clone()),
+        shown: RefCell::new(saved.regions),
         tiles,
         interiors,
         pages,
@@ -516,65 +745,102 @@ pub(super) fn build(
         dimensions: Cell::new((0, 0)),
         status,
         system_instrument,
+        maximizers,
+        minimizers,
+        advanced: Cell::new(false),
+        hidden: RefCell::new(saved.hidden),
+        transition: RefCell::new(None),
+        mode_picker: mode_picker.clone(),
+        edits: edits.clone(),
+        arrange_button: arrange.clone(),
+        command: command.clone(),
+        swap_source: Cell::new(None),
+        drop_hover: Cell::new(None),
     });
     let weak = Rc::downgrade(&surface);
     surface.background.set_draw_func(move |area, cr, w, h| {
         let Some(s) = weak.upgrade() else { return };
-        // Pick the largest empty square on a sampled grid so the emblem avoids system regions.
-        let mut best = (0.5, 0.5, 0.0);
-        if s.focused.get().is_none() {
-            for yi in 0..20 {
-                for xi in 0..20 {
-                    let x = (xi as f64 + 0.5) / 20.0;
-                    let y = (yi as f64 + 0.5) / 20.0;
-                    let mut radius = x.min(1.0 - x).min(y).min(1.0 - y);
-                    for r in s.regions.borrow().iter() {
-                        let dx = (r.x - x).max(x - (r.x + r.w)).max(0.0);
-                        let dy = (r.y - y).max(y - (r.y + r.h)).max(0.0);
-                        radius = radius.min(dx.max(dy));
-                    }
-                    if radius > best.2 {
-                        best = (x, y, radius)
-                    }
-                }
+        if s.focused.get().is_some() {
+            return;
+        }
+        let visible = s
+            .shown
+            .borrow()
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| !s.hidden.borrow()[*i])
+            .map(|(_, r)| *r)
+            .collect::<Vec<_>>();
+        let gap = logo_region(&visible);
+        let x = gap.x * w as f64 + 5.0;
+        let y = gap.y * h as f64 + 5.0;
+        let width = (gap.w * w as f64 - 10.0).max(1.0);
+        let height = (gap.h * h as f64 - 10.0).max(1.0);
+        let horizontal = width / height > 2.2;
+        let (design_w, design_h) = if horizontal {
+            (480.0, 160.0)
+        } else {
+            (210.0, 215.0)
+        };
+        let scale = (width / design_w).min(height / design_h).min(2.8);
+        if scale < 0.15 {
+            return;
+        }
+        let _ = cr.save();
+        cr.translate(
+            x + (width - design_w * scale) / 2.0,
+            y + (height - design_h * scale) / 2.0,
+        );
+        cr.scale(scale, scale);
+        let _ = cr.save();
+        cr.translate(if horizontal { 0.0 } else { 25.0 }, 0.0);
+        cr.translate(80.0, 80.0);
+        cr.scale(1.22, 1.22);
+        cr.translate(-80.0, -80.0);
+        draw_emblem(area, cr, 160, 160);
+        let _ = cr.restore();
+        cr.select_font_face(
+            "Nimbus Sans Narrow",
+            gtk::cairo::FontSlant::Normal,
+            gtk::cairo::FontWeight::Bold,
+        );
+        for (text, baseline, font_size, color) in [
+            (
+                "SYSTEM AVAILABLE",
+                if horizontal { 80.0 } else { 188.0 },
+                if horizontal { 34.0 } else { 27.0 },
+                (0.70, 0.64, 0.89),
+            ),
+            (
+                "STATION ID 1440–900",
+                if horizontal { 107.0 } else { 211.0 },
+                if horizontal { 22.0 } else { 17.0 },
+                (0.80, 0.45, 0.49),
+            ),
+        ] {
+            cr.set_font_size(font_size);
+            cr.set_source_rgb(color.0, color.1, color.2);
+            if let Ok(extent) = cr.text_extents(text) {
+                let center = if horizontal { 325.0 } else { 105.0 };
+                cr.move_to(center - extent.width() / 2.0 - extent.x_bearing(), baseline);
+                let _ = cr.show_text(text);
             }
         }
-        let size = (best.2 * 2.0 * (w.min(h)) as f64).min(280.0);
-        if size > 18.0 {
-            let _ = cr.save();
-            cr.translate(
-                best.0 * w as f64 - size / 2.0,
-                best.1 * h as f64 - size / 2.0,
-            );
-            // Reserve the bottom quarter of the available gap for the reference status lockup.
-            cr.translate(size * 0.11, 0.0);
-            cr.scale(size * 0.78 / 160.0, size * 0.78 / 160.0);
-            draw_emblem(area, cr, 160, 160);
-            let _ = cr.restore();
-            if size >= 90.0 {
-                cr.select_font_face(
-                    "Nimbus Sans Narrow",
-                    gtk::cairo::FontSlant::Normal,
-                    gtk::cairo::FontWeight::Bold,
-                );
-                for (text, baseline, font_size, color) in [
-                    ("SYSTEM AVAILABLE", 0.88, 0.145, (0.70, 0.64, 0.89)),
-                    ("STATION ID 1440–900", 1.0, 0.085, (0.80, 0.45, 0.49)),
-                ] {
-                    cr.set_font_size(size * font_size);
-                    cr.set_source_rgb(color.0, color.1, color.2);
-                    if let Ok(extent) = cr.text_extents(text) {
-                        cr.move_to(
-                            best.0 * w as f64 - extent.width() / 2.0 - extent.x_bearing(),
-                            best.1 * h as f64 - size / 2.0 + size * baseline,
-                        );
-                        let _ = cr.show_text(text);
-                    }
-                }
-            }
-        }
+        let _ = cr.restore();
     });
     for index in 0..PANELS.len() {
+        let weak = Rc::downgrade(&surface);
+        surface.maximizers[index].connect_clicked(move |_| {
+            if let Some(s) = weak.upgrade() {
+                s.maximize(index);
+            }
+        });
+        let weak = Rc::downgrade(&surface);
+        surface.minimizers[index].connect_clicked(move |_| {
+            if let Some(s) = weak.upgrade() {
+                s.minimize(index);
+            }
+        });
         for b in [&surface.headings[index], &surface.covers[index]] {
             let weak = Rc::downgrade(&surface);
             b.connect_clicked(move |_| {
@@ -586,30 +852,51 @@ pub(super) fn build(
         for (widget, resize) in [
             (&surface.headings[index], false),
             (&surface.handles[index], true),
+            (&surface.covers[index], false),
         ] {
             let drag = gtk::GestureDrag::new();
             drag.set_propagation_phase(gtk::PropagationPhase::Capture);
             let origin = Rc::new(Cell::new(defaults()[index]));
+            let pointer = Rc::new(Cell::new((0.0, 0.0)));
+            let anchor = pointer.clone();
             let weak = Rc::downgrade(&surface);
             let start = origin.clone();
-            drag.connect_drag_begin(move |gesture, _, _| {
+            drag.connect_drag_begin(move |_, x, y| {
                 if let Some(s) = weak.upgrade() {
                     if s.arranging.get() {
+                        s.transition.borrow_mut().take();
                         s.selected.set(index);
                         start.set(s.regions.borrow()[index]);
-                        gesture.set_state(gtk::EventSequenceState::Claimed);
+                        anchor.set((x, y));
                         s.layout();
                     }
                 }
             });
             let weak = Rc::downgrade(&surface);
             let start = origin.clone();
-            drag.connect_drag_update(move |_, dx, dy| {
+            let anchor = pointer.clone();
+            let preview = widget == &surface.covers[index];
+            drag.connect_drag_update(move |gesture, dx, dy| {
                 if let Some(s) = weak.upgrade() {
-                    if s.arranging.get() {
+                    if s.arranging.get() && dx.abs() + dy.abs() > 8.0 {
+                        gesture.set_state(gtk::EventSequenceState::Claimed);
+                        s.swap_source.set(None);
                         let mut r = start.get();
                         let w = s.shell.width().max(1) as f64;
                         let h = s.shell.height().max(1) as f64;
+                        if !s.advanced.get() {
+                            let (x, y) = anchor.get();
+                            s.drop_hover.set(drop_target(
+                                &s.regions.borrow(),
+                                &s.hidden.borrow(),
+                                index,
+                                r.x + (x + dx) / w,
+                                r.y + (y + dy + if preview { 52.0 } else { 0.0 }) / h,
+                            ));
+                            s.status.set_text("DROP ON A SYSTEM TO SWAP POSITIONS");
+                            s.layout();
+                            return;
+                        }
                         if resize {
                             r.w += dx / w;
                             r.h += dy / h;
@@ -623,9 +910,21 @@ pub(super) fn build(
                 }
             });
             let weak = Rc::downgrade(&surface);
-            drag.connect_drag_end(move |_, _, _| {
+            drag.connect_drag_end(move |_, dx, dy| {
                 if let Some(s) = weak.upgrade() {
-                    if s.arranging.get() {
+                    if s.arranging.get() && dx.abs() + dy.abs() > 8.0 {
+                        if !s.advanced.get() {
+                            if let Some(target) = s.drop_hover.take() {
+                                s.regions.borrow_mut().swap(index, target);
+                                // Basic swaps take effect immediately on drop.
+                                s.transition.borrow_mut().take();
+                                s.layout();
+                                s.persist();
+                            } else {
+                                s.layout();
+                            }
+                            return;
+                        }
                         let r = s.regions.borrow()[index].snap();
                         s.regions.borrow_mut()[index] = r;
                         s.layout();
@@ -637,44 +936,37 @@ pub(super) fn build(
         }
     }
     let weak = Rc::downgrade(&surface);
-    let edit_bar = edits.clone();
-    let arrange_button = arrange.clone();
     overview.connect_clicked(move |_| {
         if let Some(s) = weak.upgrade() {
-            s.focused.set(None);
-            s.arranging.set(false);
-            edit_bar.set_visible(false);
-            arrange_button.set_label("ARRANGE");
-            s.status.set_text("ALL SYSTEMS / TAP TO ZOOM IN");
+            s.home();
+        }
+    });
+    let weak = Rc::downgrade(&surface);
+    mode_picker.connect_selected_notify(move |picker| {
+        if let Some(s) = weak.upgrade() {
+            s.advanced.set(picker.selected() == 1);
+            s.swap_source.set(None);
+            s.sync_controls();
+            s.status.set_text(if s.advanced.get() {
+                "ADVANCED / DRAG TO MOVE / ↘ TO RESIZE"
+            } else {
+                "BASIC / DRAG ONTO ANOTHER SYSTEM TO SWAP"
+            });
             s.layout();
         }
     });
     let weak = Rc::downgrade(&surface);
-    let edit_bar = edits.clone();
-    arrange.connect_clicked(move |b| {
+    arrange.connect_clicked(move |_| {
         if let Some(s) = weak.upgrade() {
-            let on = !s.arranging.get();
-            s.arranging.set(on);
-            s.focused.set(None);
-            edit_bar.set_visible(on);
-            b.set_label(if on { "DONE" } else { "ARRANGE" });
-            s.status.set_text(if on {
-                "SELECT A SYSTEM / MOVE OR RESIZE"
-            } else {
-                "ALL SYSTEMS / TAP TO ZOOM IN"
-            });
-            if !on {
-                s.persist();
-            }
-            s.layout();
+            s.toggle_arrange();
         }
     });
     let weak = Rc::downgrade(&surface);
     auto.connect_clicked(move |_| {
         if let Some(s) = weak.upgrade() {
-            *s.regions.borrow_mut() = defaults();
+            s.reflow();
             s.focused.set(None);
-            s.layout();
+            s.animate();
             s.persist();
         }
     });
@@ -715,7 +1007,10 @@ pub(super) fn build(
         let Some(s) = weak.upgrade() else {
             return glib::ControlFlow::Break;
         };
-        if s.active.get() && s.dimensions.get() != (s.shell.width(), s.shell.height()) {
+        if s.active.get()
+            && (s.transition.borrow().is_some()
+                || s.dimensions.get() != (s.shell.width(), s.shell.height()))
+        {
             s.layout();
         }
         glib::ControlFlow::Continue
@@ -725,6 +1020,24 @@ pub(super) fn build(
         let single = single.clone();
         Rc::new(move |name| {
             if s.active.get() {
+                match name {
+                    "__home" => {
+                        s.home();
+                        return;
+                    }
+                    "__arrange" => {
+                        s.toggle_arrange();
+                        return;
+                    }
+                    "__auto" => {
+                        s.focused.set(None);
+                        s.reflow();
+                        s.animate();
+                        s.persist();
+                        return;
+                    }
+                    _ => {}
+                }
                 if let Some(i) = PANELS.iter().position(|(id, _)| *id == name) {
                     s.choose(i);
                 }
@@ -802,6 +1115,54 @@ mod tests {
         let restored: Vec<Region> = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(restored[0].x, 0.125);
         assert_eq!(restored.len(), 6);
+    }
+    #[test]
+    fn automatic_layout_packs_panels_and_reserves_logo_space() {
+        for count in 1..=PANELS.len() {
+            let ids = (0..count).collect::<Vec<_>>();
+            let slots = automatic(&ids);
+            let panels = ids.iter().map(|&i| slots[i]).collect::<Vec<_>>();
+            let logo = logo_region(&panels);
+            let coverage = panels.iter().map(|r| r.w * r.h).sum::<f64>() + logo.w * logo.h;
+            assert!(coverage > 0.95, "count {count}: {coverage}");
+            assert!(logo.w * logo.h > 0.09);
+            if count == 6 {
+                let areas = panels.iter().map(|r| r.w * r.h).collect::<Vec<_>>();
+                assert!(
+                    areas.iter().copied().fold(f64::NEG_INFINITY, f64::max)
+                        / areas.iter().copied().fold(f64::INFINITY, f64::min)
+                        < 1.05
+                );
+            }
+            for &i in &ids {
+                let r = slots[i];
+
+                assert!(r.x + r.w <= 1.0 && r.y + r.h <= 1.0);
+            }
+        }
+    }
+    #[test]
+    fn swap_hit_testing_excludes_hidden_and_source() {
+        let slots = defaults();
+        let mut hidden = vec![false; PANELS.len()];
+        assert_eq!(drop_target(&slots, &hidden, 0, 0.8, 0.1), Some(1));
+        hidden[1] = true;
+        assert_eq!(drop_target(&slots, &hidden, 0, 0.8, 0.1), None);
+        assert_eq!(drop_target(&slots, &hidden, 0, 0.1, 0.1), None);
+        assert_eq!(drop_target(&slots, &hidden, 0, 0.5, 0.5), None);
+    }
+    #[test]
+    fn zoom_interpolation_reaches_both_endpoints() {
+        let a = defaults()[1];
+        let b = Region {
+            x: 0.0,
+            y: 0.0,
+            w: 1.0,
+            h: 1.0,
+        };
+        assert_eq!(interpolate(a, b, 0.0).x, a.x);
+        assert_eq!(interpolate(a, b, 1.0).w, 1.0);
+        assert!(interpolate(a, b, 0.5).w > a.w);
     }
     #[test]
     fn defaults_fit_without_overlap() {

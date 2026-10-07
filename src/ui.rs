@@ -203,8 +203,8 @@ fn start_menu(navigate: Navigate) -> gtk::MenuButton {
             .collect(),
     );
     let app_scroll = scrolled(&list);
-    app_scroll.set_min_content_height(290);
-    app_scroll.set_max_content_height(330);
+    app_scroll.set_min_content_height(220);
+    app_scroll.set_max_content_height(260);
     applications.append(&app_scroll);
     let no_results = label("No matching applications.", "muted");
     no_results.set_visible(rows.is_empty());
@@ -239,6 +239,25 @@ fn start_menu(navigate: Navigate) -> gtk::MenuButton {
     }
     content.append(&systems);
     panel.append(&content);
+    let layout_controls = row(6);
+    for (target, title) in [
+        ("__home", "HOME"),
+        ("__arrange", "ARRANGE"),
+        ("__auto", "AUTO FIT"),
+    ] {
+        let entry = button(title, "start-system");
+        entry.set_hexpand(true);
+        let go = navigate.clone();
+        let weak_popup = popup.downgrade();
+        entry.connect_clicked(move |_| {
+            if let Some(p) = weak_popup.upgrade() {
+                p.popdown();
+            }
+            go(target);
+        });
+        layout_controls.append(&entry);
+    }
+    panel.append(&layout_controls);
     panel.append(&report);
     popup.set_child(Some(&panel));
     start.set_popover(Some(&popup));
@@ -270,7 +289,17 @@ pub fn build(app: &gtk::Application) {
     cap.set_width_request(18);
     header.append(&cap);
     header.append(&brand);
-    let sub = label("LIBRARY COMPUTER ACCESS / RETRIEVAL SYSTEM", "masthead-sub");
+    let badge = gtk::DrawingArea::new();
+    badge.set_content_width(32);
+    badge.set_content_height(32);
+    badge.set_draw_func(|area, cr, w, h| {
+        let _ = cr.save();
+        cr.scale(w as f64 / 160.0, h as f64 / 160.0);
+        draw_emblem(area, cr, 160, 160);
+        let _ = cr.restore();
+    });
+    header.append(&badge);
+    let sub = label("", "masthead-sub");
     sub.set_hexpand(true);
     header.append(&sub);
     let full = button("FULLSCREEN", "compact");
@@ -284,19 +313,17 @@ pub fn build(app: &gtk::Application) {
             }
         }
     });
-    header.append(&full);
-    let quit = button("EXIT", "compact");
+
+    let quit = button("EXIT", "header-exit");
+    quit.set_height_request(32);
     let weak_app = app.downgrade();
     quit.connect_clicked(move |_| {
         if let Some(a) = weak_app.upgrade() {
             a.quit();
         }
     });
+
     header.append(&quit);
-    let end_cap = column(0);
-    end_cap.add_css_class("header-end-cap");
-    end_cap.set_width_request(18);
-    header.append(&end_cap);
     root.append(&gtk::WindowHandle::builder().child(&header).build());
     let body = row(0);
     body.set_vexpand(true);
@@ -391,6 +418,10 @@ pub fn build(app: &gtk::Application) {
     stack.add_named(&scrolled(&applications_page()), Some("apps"));
     stack.add_named(&scrolled(&crate::tools::page()), Some("tools"));
     let settings = settings_page(&preferences);
+    let session_controls = row(8);
+    session_controls.append(&full);
+
+    settings.prepend(&session_controls);
     let workspace_toggle =
         gtk::CheckButton::with_label("CONSOLE MODE — touch / zoom / arrange (off: Desktop mode)");
     workspace_toggle.set_height_request(48);
@@ -413,6 +444,28 @@ pub fn build(app: &gtk::Application) {
         });
     });
     set_mode(preferences.borrow().workspace_mode);
+    let navigate_panel: Navigate = {
+        let go = navigate_panel.clone();
+        let toggle = workspace_toggle.clone();
+        Rc::new(move |name| {
+            if name.starts_with("__") {
+                toggle.set_active(true);
+            }
+            go(name);
+        })
+    };
+    let layout_controls = row(8);
+    for (target, title) in [
+        ("__home", "HOME"),
+        ("__arrange", "ARRANGE"),
+        ("__auto", "AUTO FIT"),
+    ] {
+        let control = button(title, "secondary");
+        let go = navigate_panel.clone();
+        control.connect_clicked(move |_| go(target));
+        layout_controls.append(&control);
+    }
+    settings.prepend(&layout_controls);
     body.append(&page_host);
     root.append(&body);
     let footer = row(12);
@@ -640,7 +693,7 @@ fn settings_page(prefs: &Rc<RefCell<Preferences>>) -> gtk::Box {
         });
     });
     p.append(&sound);
-    p.append(&label("Animations are disabled in this prototype. F11 toggles fullscreen; Escape always leaves fullscreen. Exit returns you to Fedora.", "strip"));
+    p.append(&label("Touch a system to zoom in; touch its title again to return home. Arrange offers Basic swaps and Advanced move/resize. F11 toggles fullscreen; Escape dismisses Start first. Exit returns to Fedora.", "strip"));
     p.append(&result);
     p.append(&label("DEVELOPMENT BASELINE", "eyebrow"));
     p.append(&label("Rust 1.98.1 • GTK 4.10 / gtk4-rs 0.9\nFedora 38 is end-of-life. Migrate to a supported Fedora release before deployment.\nThis is a desktop application; GNOME continues to manage windows and your session.", "muted"));
@@ -1350,7 +1403,19 @@ fn files_page(window: &gtk::ApplicationWindow) -> gtk::Box {
     };
     let action = open_selected.clone();
     open.connect_clicked(move |_| action());
-    list.connect_row_activated(move |_, _| open_selected());
+    // Single touch opens folders; files stay selected for preview. OPEN launches a file.
+    list.set_activate_on_single_click(true);
+    let directory_entries = entries.clone();
+    let directory_navigate = navigate.clone();
+    list.connect_row_activated(move |_, row| {
+        let item = directory_entries
+            .borrow()
+            .get(row.index() as usize)
+            .cloned();
+        if let Some(item) = item.filter(|item| item.directory) {
+            directory_navigate(item.path);
+        }
+    });
     let es = entries.clone();
     let ls = list.clone();
     let weak = window.downgrade();

@@ -160,3 +160,31 @@ progressbar trough, progressbar progress { border-radius:0; }
 .start-app:hover { background:#c395c6; color:#000; }
 .start-system { background:#a299d3; border-radius:0; font-family:"Nimbus Sans Narrow",sans-serif; font-size:17px; }
 .start-system:nth-child(3), .start-system:nth-child(6) { background:#cd747d; }
+
+/* Single-touch window controls: independent targets, no nested buttons. */
+.window-maximize, .window-minimize { color:#000; padding:0; min-width:44px; min-height:44px; font-size:24px; font-weight:800; border-radius:0; }
+.window-maximize { background:#a299d3; }
+.window-minimize { background:#ffcb64; border-radius:0 20px 20px 0; }
+.window-maximize:hover, .window-minimize:hover { background:#f4d8bb; }
+.arrange-mode { background:#ffcb64; color:#000; border-radius:0; }
+.console-band-title { font-size:14px; padding:0 5px; }
+
+.window-maximize, .window-minimize, .window-maximize:hover, .window-minimize:hover { background:transparent; border-radius:0; }
+.window-glyph { color:#000; font-size:24px; min-height:24px; font-weight:800; }
+.window-maximize .window-glyph { background:#a299d3; }
+.window-minimize .window-glyph { background:#ffcb64; border-radius:0 13px 13px 0; }
+.window-maximize:hover .window-glyph, .window-minimize:hover .window-glyph { background:#f4d8bb; }
+
+.arrange-mode popover contents { background:#000; color:#ffcb64; border:2px solid #a299d3; border-radius:0 0 16px 0; }
+.arrange-mode popover row { min-height:44px; color:#ffcb64; background:#000; }
+.arrange-mode popover row:selected { background:#a299d3; color:#000; }
+
+/* Compact identity strip; arrangement controls appear only while editing. */
+.masthead { padding:2px 8px; min-height:32px; }
+.brand { font-size:26px; }
+.masthead-sub { min-height:14px; padding:0; margin:6px 0; }
+.header-cap, .header-end-cap { margin:5px 0; }
+.console-surface { padding:3px 5px; }
+.console-region { background:#000; }
+
+.header-exit { background:#cd747d; color:#000; min-height:24px; padding:0 12px; margin:0; border-radius:0 14px 14px 0; }
