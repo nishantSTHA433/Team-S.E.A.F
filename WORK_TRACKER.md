@@ -27,13 +27,12 @@ Updated: 2026-10-07
 
 ## Active checkpoint
 
-- Current task: Step 03a–03e CURRENTLY WORKING ON: pure content-aware layout solver and invariant tests.
-- Step 01 finalized at a0597a8. Step 02 finalized as feasibility/contract work, not physical touch or external-window implementation.
-- Evidence: /mnt/macos/platform02/probe-fixed.log: GTK 4.10.5, X11 :1, keyboard/pointer only, no touchscreen, GNOME keyboard disabled, no Gtk.Socket, EWMH capabilities present.
-- Intended files: src/layout.rs, src/lib.rs, docs/layout-solver.md; WORK_TRACKER.md.
-- Scope: deterministic layout using readable minima, near-equal idle area, attention weights, emblem, explicit overflow and stable candidate selection. UI integration follows Step 04.
-- Next action: implement solver and test all system subsets, aspect ratios, bounds/overlap, zero viewport and minimum-size fallback.
-- Known limits: arbitrary external-app internal reflow unsupported by current architecture; Step 15 remains open. Touch/cursor/session acceptance deferred to their explicit steps.
+- Current task: Step 04a–04e CURRENTLY WORKING ON; begin with responsive GTK adapters, safe native-size viewport integration and media-stream continuity.
+- Steps 01–03 FINALIZED. Step 03 evidence: /mnt/macos/layout03/build.log, build/strict Clippy/31 tests passed; all 64 panel subsets across eight sizes validated. Narrow overflow bug fixed before finalization.
+- Intended files: src/console.rs, src/ui.rs, src/tools.rs, src/overview.rs, docs/responsive-adapters.md; WORK_TRACKER.md.
+- Scope: adapt existing persistent widgets without rebuilding/resetting application state; preserve saved manual arrangement. No claim that Step 05 automatic task policy or Step 06 animation polish is complete.
+- Next action: inspect and adapt viewport and focused content; reflow component rows at narrow sizes; share media stream between preview/viewer; verify build and UI states.
+- Resume: inspect /mnt/macos/responsive04/ staged changes and guest diff before reapplying. Physical touch and external app/session work remain open.
 
 ## Existing baseline — preserve, do not call final
 
@@ -65,7 +64,7 @@ Status: FINALIZED. Dependencies: 01.
 Gate: architecture is grounded in supported input/platform capabilities before broad rendering work.
 
 ### Step 03: Build the content-aware layout solver
-Status: CURRENTLY WORKING ON. Dependencies: 01, 02.
+Status: FINALIZED. Dependencies: 01, 02.
 - 03a: Allocate rectangles using readable minima, active-task needs, supporting panels, emblem and viewport.
 - 03b: Prefer roughly equal home areas when idle; allow asymmetric task-driven expansion.
 - 03c: Minimize wasted gaps while retaining readable grouping and touch separation.
@@ -74,7 +73,7 @@ Status: CURRENTLY WORKING ON. Dependencies: 01, 02.
 Gate: deterministic layouts satisfy bounds, visibility, content minima and stability across a size/panel matrix.
 
 ### Step 04: Update responsive rendering and state preservation
-Status: NOT STARTED. Dependencies: 03.
+Status: CURRENTLY WORKING ON. Dependencies: 03.
 - 04a: Implement compact, standard, expanded and focused compositions selected by width AND height.
 - 04b: Reflow sections/columns; preserve native readable text instead of shrinking whole pages.
 - 04c: Preserve file selection, path, search, scroll, media position, test progress and input focus.
@@ -247,3 +246,7 @@ Commit/export reference (if applicable):
 2026-10-07 / Step 01 FINALIZED: Fedora build and strict Clippy passed, 26/26 tests, successful visual launch. Step 02 CURRENTLY WORKING ON: input/platform feasibility and interaction contract.
 
 2026-10-07 / Step 02 FINALIZED: measured platform/input capabilities and documented integration boundary; no system settings changed. Step 03 CURRENTLY WORKING ON: content-aware solver.
+
+Step 03 verification update: narrow-viewport test caught avoidable 8px horizontal overflow. Restricting candidates to viewport width (or largest unavoidable single-panel minimum); then re-running full validation.
+
+2026-10-07 / Step 03 FINALIZED: solver and invariant matrix passed, 31 total tests, strict Clippy/build clean. Step 04 CURRENTLY WORKING ON: live responsive adapters and preservation.
