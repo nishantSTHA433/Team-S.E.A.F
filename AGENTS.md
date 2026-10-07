@@ -1,0 +1,3 @@
+# LCARS project execution instructions
+
+Before making any project changes, read WORK_TRACKER.md in this directory. Follow its mandatory checkpoint protocol: save CURRENTLY WORKING ON for the exact step/subtasks and populate the active checkpoint before implementation. Update evidence, status and the next action after milestones and before ending a response. On interruption, reconcile the tracker with actual files and git state before resuming. This tracker is assistant-maintained and user-visible. User instructions take precedence. Do not treat implemented, verified and finalized as equivalent.

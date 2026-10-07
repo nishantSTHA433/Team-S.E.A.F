@@ -131,14 +131,7 @@ fn card(title: &str) -> (gtk::Box, gtk::Label, gtk::ProgressBar) {
 
 type Navigate = Rc<dyn Fn(&str)>;
 type SetMode = Rc<dyn Fn(bool)>;
-const PANELS: [(&str, &str); 6] = [
-    ("dashboard", "SYSTEM"),
-    ("files", "FILES"),
-    ("network", "NETWORK"),
-    ("apps", "APPLICATIONS"),
-    ("tools", "UTILITIES"),
-    ("settings", "PREFERENCES"),
-];
+const PANELS: [(&str, &str); 6] = lcars_desktop::workspace::PANEL_CATALOG;
 
 #[path = "console.rs"]
 mod console;
