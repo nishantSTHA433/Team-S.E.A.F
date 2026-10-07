@@ -27,13 +27,13 @@ Updated: 2026-10-07
 
 ## Active checkpoint
 
-- Current task: Step 02a–02d CURRENTLY WORKING ON.
-- Step 01 finalized: pure shared model, six content contracts, typed identities/events, ownership audit. Only catalogue is wired into the existing renderer; full state migration belongs to Step 04.
-- Evidence: /mnt/macos/model01/build.log; build/strict Clippy/26 tests passed; Fedora app launch visually checked.
-- Scope: read-only runtime/API probes and platform/interaction documentation; no desktop/security changes.
-- Intended files: docs/platform-boundaries.md; tools/platform_probe.py; WORK_TRACKER.md.
-- Next action: inspect GTK devices/session/API availability; document supported built-in versus external app boundary and defer physical validation explicitly.
-- Resume: inspect /mnt/macos/platform02/probe.log and actual files before rerunning.
+- Current task: Step 03a–03e CURRENTLY WORKING ON: pure content-aware layout solver and invariant tests.
+- Step 01 finalized at a0597a8. Step 02 finalized as feasibility/contract work, not physical touch or external-window implementation.
+- Evidence: /mnt/macos/platform02/probe-fixed.log: GTK 4.10.5, X11 :1, keyboard/pointer only, no touchscreen, GNOME keyboard disabled, no Gtk.Socket, EWMH capabilities present.
+- Intended files: src/layout.rs, src/lib.rs, docs/layout-solver.md; WORK_TRACKER.md.
+- Scope: deterministic layout using readable minima, near-equal idle area, attention weights, emblem, explicit overflow and stable candidate selection. UI integration follows Step 04.
+- Next action: implement solver and test all system subsets, aspect ratios, bounds/overlap, zero viewport and minimum-size fallback.
+- Known limits: arbitrary external-app internal reflow unsupported by current architecture; Step 15 remains open. Touch/cursor/session acceptance deferred to their explicit steps.
 
 ## Existing baseline — preserve, do not call final
 
@@ -57,7 +57,7 @@ Status: FINALIZED. Dependencies: 00.
 Gate: explicit model covers all six systems and state transitions without resetting work; record files and decisions.
 
 ### Step 02: Prove the platform and input boundaries early
-Status: CURRENTLY WORKING ON. Dependencies: 01.
+Status: FINALIZED. Dependencies: 01.
 - 02a: Document exact title/taskbar/maximize/minimize/content-tap behavior; no essential double taps or hover.
 - 02b: Determine GTK/UTM touch, keyboard, accessibility and rendering constraints with small focused checks.
 - 02c: Prototype feasibility of native external-window integration and Fedora shell/session boundary. Do not promise internal reflow of arbitrary third-party apps.
@@ -65,7 +65,7 @@ Status: CURRENTLY WORKING ON. Dependencies: 01.
 Gate: architecture is grounded in supported input/platform capabilities before broad rendering work.
 
 ### Step 03: Build the content-aware layout solver
-Status: NOT STARTED. Dependencies: 01, 02.
+Status: CURRENTLY WORKING ON. Dependencies: 01, 02.
 - 03a: Allocate rectangles using readable minima, active-task needs, supporting panels, emblem and viewport.
 - 03b: Prefer roughly equal home areas when idle; allow asymmetric task-driven expansion.
 - 03c: Minimize wasted gaps while retaining readable grouping and touch separation.
@@ -245,3 +245,5 @@ Commit/export reference (if applicable):
 2026-10-07 / Step 01a–01d CURRENTLY WORKING ON: checkpoint saved before source changes; audit and shared model are the authorized scope.
 
 2026-10-07 / Step 01 FINALIZED: Fedora build and strict Clippy passed, 26/26 tests, successful visual launch. Step 02 CURRENTLY WORKING ON: input/platform feasibility and interaction contract.
+
+2026-10-07 / Step 02 FINALIZED: measured platform/input capabilities and documented integration boundary; no system settings changed. Step 03 CURRENTLY WORKING ON: content-aware solver.
