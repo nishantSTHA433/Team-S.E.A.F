@@ -17,7 +17,7 @@ fn button(s: &str) -> gtk::Button {
     b
 }
 
-pub fn speed_panel() -> gtk::Box {
+pub fn speed_panel() -> (gtk::Box, gtk::Label) {
     let p = gtk::Box::new(gtk::Orientation::Vertical, 10);
     p.add_css_class("card");
     p.append(&label("SUBSPACE TRANSFER / SPEED TEST"));
@@ -37,6 +37,7 @@ pub fn speed_panel() -> gtk::Box {
     stop.connect_clicked(move |_| {
         c.store(true, Ordering::Relaxed);
     });
+    let summary = result.clone();
     start.connect_clicked(move |b| {
         b.set_sensitive(false);
         stop.set_sensitive(true);
@@ -66,10 +67,10 @@ pub fn speed_panel() -> gtk::Box {
             glib::ControlFlow::Continue
         });
     });
-    p
+    (p, summary)
 }
 
-pub fn page() -> gtk::Box {
+pub fn page() -> (gtk::Box, gtk::Label, gtk::TextBuffer) {
     let p = gtk::Box::new(gtk::Orientation::Vertical, 14);
     p.set_margin_start(24);
     p.set_margin_end(24);
@@ -129,6 +130,7 @@ pub fn page() -> gtk::Box {
         .vexpand(true)
         .build();
     p.append(&scroll);
+    let summary = output.buffer();
     refresh.connect_clicked(move |b| {
         b.set_sensitive(false);
         let (tx, rx) = mpsc::channel();
@@ -167,5 +169,5 @@ pub fn page() -> gtk::Box {
             }
         });
     });
-    p
+    (p, out, summary)
 }

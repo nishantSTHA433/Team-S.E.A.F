@@ -280,6 +280,7 @@ pub fn build(app: &gtk::Application) {
         .default_height(700)
         .build();
     let preferences = Rc::new(RefCell::new(Preferences::load()));
+    let console_data = Rc::new(RefCell::new(console::InstrumentData::default()));
     let root = column(0);
     let header = row(5);
     header.add_css_class("masthead");
@@ -412,11 +413,17 @@ pub fn build(app: &gtk::Application) {
     dashboard.append(&storage);
     dashboard.append(&label("Virtual machine readings reflect Fedora, not the Mac host. Sensors not exposed by UTM are unavailable.", "muted"));
     stack.add_named(&scrolled(&dashboard), Some("dashboard"));
-    stack.add_named(&scrolled(&files_page(&window)), Some("files"));
-    let (network_page, network_status) = network_page();
+    stack.add_named(
+        &scrolled(&files_page(&window, &console_data)),
+        Some("files"),
+    );
+    let (network_page, network_status) = network_page(&console_data);
     stack.add_named(&scrolled(&network_page), Some("network"));
-    stack.add_named(&scrolled(&applications_page()), Some("apps"));
-    stack.add_named(&scrolled(&crate::tools::page()), Some("tools"));
+    stack.add_named(&scrolled(&applications_page(&console_data)), Some("apps"));
+    let (tools_page, calculator, diagnostics) = crate::tools::page();
+    console_data.borrow_mut().sources.calculator = Some(calculator);
+    console_data.borrow_mut().sources.diagnostics = Some(diagnostics);
+    stack.add_named(&scrolled(&tools_page), Some("tools"));
     let settings = settings_page(&preferences);
     let session_controls = row(8);
     session_controls.append(&full);
@@ -428,7 +435,6 @@ pub fn build(app: &gtk::Application) {
     workspace_toggle.set_active(preferences.borrow().workspace_mode);
     settings.prepend(&workspace_toggle);
     stack.add_named(&scrolled(&settings), Some("settings"));
-    let console_data = Rc::new(RefCell::new(console::InstrumentData::default()));
     let (page_host, navigate_panel, set_mode) =
         console::build(&stack, &preferences, console_data.clone());
     let mode_result = label("", "muted");
@@ -702,12 +708,13 @@ fn settings_page(prefs: &Rc<RefCell<Preferences>>) -> gtk::Box {
     p
 }
 
-fn network_page() -> (gtk::Box, gtk::Label) {
+fn network_page(data: &Rc<RefCell<console::InstrumentData>>) -> (gtk::Box, gtk::Label) {
     let p = page(
         "NETWORK OPERATIONS",
         "Connection awareness and local diagnostics",
     );
     let status = label("CHECKING", "strip");
+    data.borrow_mut().sources.network_status = Some(status.clone());
     p.append(&status);
     let controls = row(12);
     let diagnose = button("RUN LOCAL DIAGNOSTICS", "primary");
@@ -719,6 +726,7 @@ fn network_page() -> (gtk::Box, gtk::Label) {
     output.set_editable(false);
     output.set_monospace(true);
     output.set_wrap_mode(gtk::WrapMode::WordChar);
+    data.borrow_mut().sources.network_report = Some(output.buffer());
     output.buffer().set_text("Run diagnostics to inspect adapters, addresses, routes, and DNS configuration.\nNo connection will be changed.");
     p.append(&label(
         "ADAPTERS / ROUTES / NAME RESOLUTION",
@@ -768,11 +776,13 @@ fn network_page() -> (gtk::Box, gtk::Label) {
         }
     });
     p.append(&launch_message);
-    p.append(&crate::tools::speed_panel());
+    let (speed_panel, speed_result) = crate::tools::speed_panel();
+    data.borrow_mut().sources.speed_result = Some(speed_result);
+    p.append(&speed_panel);
     (p, status)
 }
 
-fn applications_page() -> gtk::Box {
+fn applications_page(data: &Rc<RefCell<console::InstrumentData>>) -> gtk::Box {
     let p = page(
         "APPLICATION DIRECTORY",
         "Native Fedora applications • Launches in standard desktop windows",
@@ -782,6 +792,7 @@ fn applications_page() -> gtk::Box {
     search.set_height_request(48);
     p.append(&search);
     let message = label("Select an application to launch it.", "muted");
+    data.borrow_mut().sources.apps_status = Some(message.clone());
     p.append(&message);
     let list = gtk::ListBox::new();
     list.set_selection_mode(gtk::SelectionMode::None);
@@ -789,6 +800,7 @@ fn applications_page() -> gtk::Box {
     let mut apps = gio::AppInfo::all();
     apps.retain(|a| a.should_show());
     apps.sort_by_key(|a| a.display_name().to_lowercase());
+    data.borrow_mut().sources.apps_list = Some(list.clone());
     let rows: Rc<Vec<(String, gtk::ListBoxRow)>> = Rc::new(
         apps.into_iter()
             .map(|a| {
@@ -1178,7 +1190,10 @@ fn media_preview(window: &gtk::ApplicationWindow) -> (gtk::Box, PreviewUpdate) {
     (panel, update)
 }
 
-fn files_page(window: &gtk::ApplicationWindow) -> gtk::Box {
+fn files_page(
+    window: &gtk::ApplicationWindow,
+    data: &Rc<RefCell<console::InstrumentData>>,
+) -> gtk::Box {
     let p = page(
         "FILE ACCESS",
         "Browse Fedora files • Linux paths are shown explicitly",
@@ -1210,6 +1225,9 @@ fn files_page(window: &gtk::ApplicationWindow) -> gtk::Box {
     list.add_css_class("directory");
     list.set_selection_mode(gtk::SelectionMode::Single);
     let list_scroll = scrolled(&list);
+    data.borrow_mut().sources.files_path = Some(path.clone());
+    data.borrow_mut().sources.files_list = Some(list.clone());
+    data.borrow_mut().sources.files_status = Some(status.clone());
     list_scroll.set_min_content_height(250);
     let file_table = column(0);
     file_table.set_hexpand(true);
@@ -1231,6 +1249,7 @@ fn files_page(window: &gtk::ApplicationWindow) -> gtk::Box {
     detail.append(&preview);
     detail.append(&label("SELECTION DETAILS", "instrument-title"));
     let metadata = label("Select a file or folder.", "muted");
+    data.borrow_mut().sources.file_details = Some(metadata.clone());
     metadata.set_selectable(true);
     metadata.set_wrap_mode(gtk::pango::WrapMode::WordChar);
     detail.append(&metadata);
