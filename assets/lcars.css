@@ -188,3 +188,17 @@ progressbar trough, progressbar progress { border-radius:0; }
 .console-region { background:#000; }
 
 .header-exit { background:#cd747d; color:#000; min-height:24px; padding:0 12px; margin:0; border-radius:0 14px 14px 0; }
+
+/* Reference pass 12: open instrument rails and compact segmented controls. */
+.console-region { border-left-color:#c47ea7; }
+.console-band-title { border-left:6px solid #ffcb64; border-radius:14px 0 0 0; padding-left:7px; }
+.window-minimize .window-glyph { background:#cd747d; }
+.card { border-right:0; border-bottom:0; border-left:3px solid #a299d3; border-top:5px solid #c47ea7; border-radius:16px 0 0 0; }
+.history-panel { border-right:0; border-left:3px solid #a299d3; border-top:3px solid #cd747d; border-bottom:0; border-radius:12px 0 0 0; }
+.eyebrow, .table-heading, .dock-button, .file-row, .start-app { font-family:"Nimbus Sans Narrow",sans-serif; }
+.eyebrow, .table-heading { font-size:14px; }
+.dock-button { font-size:14px; border-top:3px solid #c47ea7; }
+.dock-button:nth-child(3) { background:#cd747d; }
+.dock-button:nth-child(4) { background:#c395c6; }
+scrollbar slider { background:#a299d3; border-radius:0; min-width:6px; min-height:24px; }
+scrollbar trough { background:#000; }

@@ -55,8 +55,10 @@ impl Paint<'_> {
         let _ = self.cr.show_text(&layout);
     }
     fn band(&self, y: f64, text: &str) {
-        self.rect(8.0, y, self.width - 16.0, 22.0, LILAC);
-        self.text(14.0, y + 16.0, 14.0, self.width - 28.0, text, INK);
+        self.rect(8.0, y, self.width - 42.0, 22.0, LILAC);
+        self.rect(self.width - 31.0, y, 10.0, 22.0, CORAL);
+        self.rect(self.width - 18.0, y, 10.0, 22.0, AMBER);
+        self.text(14.0, y + 16.0, 14.0, self.width - 54.0, text, INK);
     }
     fn pair(&self, y: f64, key: &str, value: &str) {
         let split = (self.width * 0.48).clamp(100.0, 240.0);
@@ -195,9 +197,12 @@ fn draw_table(p: &Paint<'_>, source: &Sources, index: usize, offset: &Cell<usize
         if apps {
             "INSTALLED APPLICATIONS"
         } else {
-            "NAME                       SIZE / TYPE"
+            "NAME"
         },
     );
+    if !apps && p.width >= 310.0 {
+        p.text(p.width - 102.0, 54.0, 14.0, 65.0, "DETAILS", INK);
+    }
     let (columns, count, row_h) = table_capacity(p.width, p.height, 66.0, apps);
     let start = offset
         .get()
@@ -281,6 +286,15 @@ fn draw_system(p: &Paint<'_>, data: &InstrumentData) {
             (0.20, 0.16, 0.25),
         );
     }
+    for i in 0..=8 {
+        p.rect(
+            10.0 + (p.width - 20.0) * i as f64 / 8.0,
+            gy,
+            1.0,
+            graph_h,
+            (0.12, 0.10, 0.16),
+        );
+    }
     p.cr.set_source_rgb(LILAC.0, LILAC.1, LILAC.2);
     p.cr.set_line_width(1.5);
     for (i, value) in data.history.iter().enumerate() {
@@ -318,16 +332,24 @@ fn draw_system(p: &Paint<'_>, data: &InstrumentData) {
                 .unwrap_or_else(|| "—".into()),
             AMBER,
         );
-        p.rect(x, top + 26.0, cell_w - 10.0, bar_h, (0.18, 0.12, 0.18));
+        let gauge_w = (cell_w * 0.56).clamp(18.0, 56.0);
+        let gx = x + (cell_w - 10.0 - gauge_w) * 0.5;
+        p.rect(gx, top + 26.0, gauge_w, bar_h, CORAL);
+        p.rect(gx + 1.0, top + 27.0, gauge_w - 2.0, bar_h - 2.0, INK);
         if let Some(v) = value {
             let fill = bar_h * v.clamp(0.0, 100.0) / 100.0;
             p.rect(
-                x,
+                gx + 2.0,
                 top + 26.0 + bar_h - fill,
-                cell_w - 10.0,
-                fill,
+                gauge_w - 4.0,
+                (fill - 2.0).max(0.0),
                 if i == 0 { AMBER } else { CORAL },
             );
+        }
+        for tick in 1..5 {
+            let ty = top + 26.0 + bar_h * tick as f64 / 5.0;
+            p.rect(gx - 4.0, ty, 4.0, 1.0, LILAC);
+            p.rect(gx + gauge_w, ty, 4.0, 1.0, LILAC);
         }
         p.text(x, top + bar_h + 45.0, 16.0, cell_w - 4.0, name, LILAC);
     }
