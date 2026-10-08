@@ -75,6 +75,35 @@ fn row(spacing: i32) -> gtk::Box {
     gtk::Box::new(gtk::Orientation::Horizontal, spacing)
 }
 
+/// Reflow existing children without rebuilding their values or signal connections.
+pub(crate) fn adaptive_row(container: &gtk::Box, owner: &gtk::Widget, breakpoint: i32) {
+    let weak = container.downgrade();
+    let owner = owner.downgrade();
+    let vertical = Cell::new(false);
+    container.add_tick_callback(move |_, _| {
+        let (Some(row), Some(owner)) = (weak.upgrade(), owner.upgrade()) else {
+            return glib::ControlFlow::Break;
+        };
+        let width = owner.width();
+        if width > 0 {
+            let next = if vertical.get() {
+                width < breakpoint + 24
+            } else {
+                width < breakpoint
+            };
+            if next != vertical.get() {
+                vertical.set(next);
+                row.set_orientation(if next {
+                    gtk::Orientation::Vertical
+                } else {
+                    gtk::Orientation::Horizontal
+                });
+            }
+        }
+        glib::ControlFlow::Continue
+    });
+}
+
 fn button(text: &str, class: &str) -> gtk::Button {
     let b = gtk::Button::with_label(text);
     b.add_css_class(class);
@@ -386,6 +415,7 @@ pub fn build(app: &gtk::Application) {
     history_panel.append(&label("0–100% / LIVE SAMPLES", "graph-scale"));
     hero.append(&history_panel);
     dashboard.append(&hero);
+    adaptive_row(&hero, dashboard.upcast_ref(), 760);
     let metrics = gtk::Grid::builder()
         .column_spacing(14)
         .row_spacing(14)
@@ -402,6 +432,41 @@ pub fn build(app: &gtk::Application) {
     metrics.attach(&net_card, 0, 1, 1, 1);
     metrics.attach(&time_card, 1, 1, 1, 1);
     dashboard.append(&metrics);
+    let weak_metrics = metrics.downgrade();
+    let weak_dashboard = dashboard.downgrade();
+    let metric_cards = [
+        cpu_card.clone(),
+        mem_card.clone(),
+        net_card.clone(),
+        time_card.clone(),
+    ];
+    let one_column = Cell::new(false);
+    dashboard.add_tick_callback(move |_, _| {
+        let (Some(grid), Some(page)) = (weak_metrics.upgrade(), weak_dashboard.upgrade()) else {
+            return glib::ControlFlow::Break;
+        };
+        let narrow = if one_column.get() {
+            page.width() < 584
+        } else {
+            page.width() < 560
+        };
+        if narrow != one_column.get() && page.width() > 0 {
+            one_column.set(narrow);
+            for card in &metric_cards {
+                grid.remove(card);
+            }
+            for (i, card) in metric_cards.iter().enumerate() {
+                grid.attach(
+                    card,
+                    if narrow { 0 } else { (i % 2) as i32 },
+                    if narrow { i as i32 } else { (i / 2) as i32 },
+                    1,
+                    1,
+                );
+            }
+        }
+        glib::ControlFlow::Continue
+    });
     let storage = label("STORAGE / Reading filesystem…", "strip");
     dashboard.append(&storage);
     dashboard.append(&label("Virtual machine readings reflect Fedora, not the Mac host. Sensors not exposed by UTM are unavailable.", "muted"));
@@ -470,10 +535,21 @@ pub fn build(app: &gtk::Application) {
     let footer = row(12);
     footer.add_css_class("footer");
     let indicator = label("● CHECKING NETWORK", "status");
-    indicator.set_hexpand(true);
+    indicator.set_ellipsize(gtk::pango::EllipsizeMode::End);
+    indicator.set_max_width_chars(22);
     let clock = label("", "console-clock");
     let start = start_menu(navigate_panel.clone());
     footer.append(&start);
+    let shortcuts = row(6);
+    let shortcut_scroll = gtk::ScrolledWindow::builder()
+        .hscrollbar_policy(gtk::PolicyType::Automatic)
+        .vscrollbar_policy(gtk::PolicyType::Never)
+        .hexpand(true)
+        .child(&shortcuts)
+        .build();
+    shortcut_scroll.update_property(&[gtk::accessible::Property::Label(
+        "System shortcuts; scroll horizontally for more",
+    )]);
     for (title, target) in [
         ("SYSTEM", "dashboard"),
         ("FILES", "files"),
@@ -484,8 +560,9 @@ pub fn build(app: &gtk::Application) {
         shortcut.set_height_request(48);
         let navigate = navigate_panel.clone();
         shortcut.connect_clicked(move |_| navigate(target));
-        footer.append(&shortcut);
+        shortcuts.append(&shortcut);
     }
+    footer.append(&shortcut_scroll);
     footer.append(&indicator);
     footer.append(&clock);
     root.append(&footer);
@@ -715,6 +792,7 @@ fn network_page(data: &Rc<RefCell<console::InstrumentData>>) -> (gtk::Box, gtk::
     controls.append(&diagnose);
     controls.append(&settings);
     p.append(&controls);
+    adaptive_row(&controls, p.upcast_ref(), 560);
     let output = gtk::TextView::new();
     output.set_editable(false);
     output.set_monospace(true);
@@ -1010,9 +1088,7 @@ fn media_preview(window: &gtk::ApplicationWindow) -> (gtk::Box, PreviewUpdate) {
         let Some((path, is_video)) = selected.borrow().clone() else {
             return;
         };
-        if let Some(s) = inline_video.media_stream() {
-            s.pause();
-        }
+        let stream = inline_video.media_stream();
         let viewer = gtk::Window::builder()
             .transient_for(&parent)
             .title("LCARS / MEDIA VIEWER")
@@ -1029,8 +1105,9 @@ fn media_preview(window: &gtk::ApplicationWindow) -> (gtk::Box, PreviewUpdate) {
             "page-title",
         ));
         if is_video {
-            let player = gtk::Video::for_filename(Some(&path));
-            player.set_autoplay(true);
+            let player = gtk::Video::new();
+            player.set_media_stream(stream.as_ref());
+            player.set_autoplay(false);
             player.set_hexpand(true);
             player.set_vexpand(true);
             player.connect_unmap(|v| {
@@ -1203,6 +1280,7 @@ fn files_page(
     controls.append(&path);
     controls.append(&go);
     p.append(&controls);
+    adaptive_row(&controls, p.upcast_ref(), 660);
     let volumes = gio::VolumeMonitor::get();
     let drives = row(8);
     let root = button("C:  SYSTEM /", "secondary");
@@ -1210,6 +1288,7 @@ fn files_page(
     p.append(&drives);
     let mounted = row(8);
     p.append(&mounted);
+    adaptive_row(&mounted, p.upcast_ref(), 640);
     let status = label("", "muted");
     p.append(&status);
     let content = row(16);
@@ -1236,7 +1315,7 @@ fn files_page(
     file_table.append(&list_scroll);
     content.append(&file_table);
     let detail = column(12);
-    detail.set_width_request(260);
+    detail.set_width_request(220);
     detail.add_css_class("card");
     let (preview, update_preview) = media_preview(window);
     detail.append(&preview);
@@ -1254,22 +1333,7 @@ fn files_page(
     detail.append(&trash);
     content.append(&detail);
     p.append(&content);
-    let weak_content = content.downgrade();
-    let weak_page = p.downgrade();
-    p.add_tick_callback(move |_, _| {
-        let (Some(content), Some(page)) = (weak_content.upgrade(), weak_page.upgrade()) else {
-            return glib::ControlFlow::Break;
-        };
-        let orientation = if page.width() < 700 {
-            gtk::Orientation::Vertical
-        } else {
-            gtk::Orientation::Horizontal
-        };
-        if content.orientation() != orientation {
-            content.set_orientation(orientation);
-        }
-        glib::ControlFlow::Continue
-    });
+    adaptive_row(&content, p.upcast_ref(), 700);
     let entries: Rc<RefCell<Vec<FileItem>>> = Rc::new(RefCell::new(Vec::new()));
     let filter = gtk::SearchEntry::new();
     filter.set_placeholder_text(Some("FILTER CURRENT DIRECTORY"));
@@ -1479,4 +1543,151 @@ fn files_page(
     });
     navigate(services::home());
     p
+}
+
+#[cfg(test)]
+mod gtk_adapter_tests {
+    use super::*;
+    fn until(mut ready: impl FnMut() -> bool) {
+        let context = glib::MainContext::default();
+        let start = std::time::Instant::now();
+        while !ready() {
+            while context.pending() {
+                context.iteration(false);
+            }
+            assert!(
+                start.elapsed() < Duration::from_secs(8),
+                "GTK adapter check timed out"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+    #[test]
+    #[ignore = "requires active Fedora display and LCARS_MEDIA_FIXTURE; run explicitly"]
+    fn gtk_adapters_preserve_input_and_shared_video_stream() {
+        gtk::init().expect("GTK display required for adapter validation");
+        let validation_app = gtk::Application::builder()
+            .application_id("org.lcars.AdapterCheck")
+            .build();
+        validation_app
+            .register(None::<&gio::Cancellable>)
+            .expect("register validation application");
+        let window = gtk::ApplicationWindow::builder()
+            .application(&validation_app)
+            .default_width(800)
+            .default_height(400)
+            .build();
+        let content = column(8);
+        let inputs = row(8);
+        let first = gtk::Entry::new();
+        first.set_width_chars(6);
+        first.set_text("selected value");
+        let second = gtk::Entry::new();
+        second.set_width_chars(6);
+        second.set_text("persistent query");
+        inputs.append(&first);
+        inputs.append(&second);
+        content.append(&inputs);
+        adaptive_row(&inputs, window.upcast_ref(), 520);
+        window.set_child(Some(&content));
+        window.present();
+        until(|| window.width() >= 750);
+        assert_eq!(inputs.orientation(), gtk::Orientation::Horizontal);
+        window.set_default_size(400, 400);
+        until(|| inputs.orientation() == gtk::Orientation::Vertical);
+        assert_eq!(first.text(), "selected value");
+        assert_eq!(second.text(), "persistent query");
+        window.set_default_size(800, 400);
+        until(|| inputs.orientation() == gtk::Orientation::Horizontal);
+        assert_eq!(second.text(), "persistent query");
+        let fixture =
+            std::env::var("LCARS_MEDIA_FIXTURE").expect("explicit media fixture required");
+        let stream = gtk::MediaFile::for_filename(fixture);
+        stream.set_muted(true);
+        let inline = gtk::Video::new();
+        inline.set_media_stream(Some(&stream));
+        content.append(&inline);
+        until(|| stream.is_prepared() || stream.error().is_some());
+        assert!(
+            stream.error().is_none(),
+            "fixture decode failed: {:?}",
+            stream.error()
+        );
+        assert!(stream.is_seekable());
+        let target = stream.duration() / 2;
+        assert!(target > 0);
+        stream.seek(target);
+        until(|| (stream.timestamp() - target).abs() < 250_000);
+        let expanded = gtk::Video::new();
+        expanded.set_media_stream(inline.media_stream().as_ref());
+        content.append(&expanded);
+        assert_eq!(expanded.media_stream(), inline.media_stream());
+        assert!((expanded.media_stream().unwrap().timestamp() - target).abs() < 250_000);
+        assert!(
+            !stream.is_playing(),
+            "opening expanded view must respect paused state"
+        );
+        window.close();
+        let config =
+            std::env::temp_dir().join(format!("lcars-adapter-check-{}", std::process::id()));
+        std::env::set_var("XDG_CONFIG_HOME", &config);
+        Preferences {
+            sound: false,
+            reduced_motion: true,
+            workspace_mode: false,
+        }
+        .save()
+        .unwrap();
+        build(&validation_app);
+        let full = validation_app
+            .windows()
+            .into_iter()
+            .find(|w| w.is_visible())
+            .expect("full interface window");
+        fn find_pages(widget: &gtk::Widget) -> Option<gtk::Stack> {
+            if let Some(stack) = widget.downcast_ref::<gtk::Stack>() {
+                if stack.child_by_name("dashboard").is_some() {
+                    return Some(stack.clone());
+                }
+            }
+            let mut child = widget.first_child();
+            while let Some(w) = child {
+                child = w.next_sibling();
+                if let Some(found) = find_pages(&w) {
+                    return Some(found);
+                }
+            }
+            None
+        }
+        let pages = find_pages(full.upcast_ref()).expect("six system pages");
+        for (route, _) in PANELS {
+            pages.set_visible_child_name(route);
+            let page = pages.child_by_name(route).unwrap();
+            for (width, height) in [(1000, 720), (640, 540), (800, 440), (640, 740), (1000, 720)] {
+                full.set_default_size(width, height);
+                until(|| page.is_mapped() && page.width() > 0);
+                let start = std::time::Instant::now();
+                while start.elapsed() < Duration::from_millis(180) {
+                    while glib::MainContext::default().pending() {
+                        glib::MainContext::default().iteration(false);
+                    }
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+                assert!(page.width() > 0 && page.height() > 0);
+                assert_eq!(
+                    full.width(),
+                    width,
+                    "{route}: shell must fit requested width"
+                );
+                assert_eq!(
+                    full.height(),
+                    height,
+                    "{route}: shell must fit requested height"
+                );
+                println!("PAGE_RENDERED {route}: requested={width}x{height}, actual={}x{}, content={}x{}",full.width(),full.height(),page.width(),page.height());
+            }
+        }
+        full.close();
+        println!("GTK_ADAPTERS_VERIFIED: wide/narrow/wide preserves input; prepared shared video preserves seek and pause");
+    }
 }

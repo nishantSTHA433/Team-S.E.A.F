@@ -189,6 +189,8 @@ fn layout_path() -> std::path::PathBuf {
 struct SavedLayout {
     regions: Vec<Region>,
     hidden: Vec<bool>,
+    #[serde(default)]
+    automatic: bool,
 }
 fn load() -> SavedLayout {
     std::fs::read(layout_path())
@@ -198,19 +200,22 @@ fn load() -> SavedLayout {
         .map(|v| SavedLayout {
             regions: v.regions.into_iter().map(Region::bounded).collect(),
             hidden: v.hidden,
+            automatic: v.automatic,
         })
         .unwrap_or_else(|| SavedLayout {
             regions: defaults(),
             hidden: vec![false; PANELS.len()],
+            automatic: true,
         })
 }
-fn save(regions: &[Region], hidden: &[bool]) -> Result<(), String> {
+fn save(regions: &[Region], hidden: &[bool], automatic: bool) -> Result<(), String> {
     let path = layout_path();
     std::fs::create_dir_all(path.parent().ok_or("Missing configuration directory")?)
         .map_err(|e| e.to_string())?;
     let bytes = serde_json::to_vec_pretty(&SavedLayout {
         regions: regions.to_vec(),
         hidden: hidden.to_vec(),
+        automatic,
     })
     .map_err(|e| e.to_string())?;
     let temp = path.with_extension("tmp");
@@ -219,6 +224,9 @@ fn save(regions: &[Region], hidden: &[bool]) -> Result<(), String> {
 }
 struct Surface {
     shell: gtk::Overlay,
+    viewport: gtk::ScrolledWindow,
+    auto_layout: Cell<bool>,
+    solution: RefCell<Option<lcars_desktop::layout::Solution>>,
     canvas: gtk::Fixed,
     background: gtk::DrawingArea,
     regions: RefCell<Vec<Region>>,
@@ -251,15 +259,21 @@ struct Surface {
 }
 impl Surface {
     fn persist(&self) {
-        self.status
-            .set_text(&match save(&self.regions.borrow(), &self.hidden.borrow()) {
-                Ok(()) => "ARRANGEMENT SAVED".into(),
-                Err(e) => format!("SAVE FAILED / {e}"),
-            });
+        self.status.set_text(&match save(
+            &self.regions.borrow(),
+            &self.hidden.borrow(),
+            self.auto_layout.get(),
+        ) {
+            Ok(()) => "ARRANGEMENT SAVED".into(),
+            Err(e) => format!("SAVE FAILED / {e}"),
+        });
     }
     fn toggle_arrange(&self) {
         let on = !self.arranging.get();
         self.arranging.set(on);
+        if on {
+            self.auto_layout.set(false);
+        }
         self.focused.set(None);
         self.advanced.set(false);
         self.mode_picker.set_selected(0);
@@ -277,6 +291,9 @@ impl Surface {
     }
     fn home(&self) {
         self.focused.set(None);
+        if self.auto_layout.get() {
+            self.pack();
+        }
         self.arranging.set(false);
         self.sync_controls();
         self.status.set_text("HOME / TOUCH A SYSTEM TO ZOOM IN");
@@ -296,10 +313,39 @@ impl Surface {
         self.layout();
     }
     fn reflow(&self) {
-        let visible = (0..PANELS.len())
-            .filter(|&i| !self.hidden.borrow()[i])
-            .collect::<Vec<_>>();
-        *self.regions.borrow_mut() = automatic(&visible);
+        self.auto_layout.set(true);
+        self.pack();
+    }
+    fn pack(&self) {
+        use lcars_desktop::{
+            layout::{self, Request},
+            workspace::PanelId,
+        };
+        let request = Request {
+            viewport: (
+                (self.viewport.width() - 6).max(1) as u32,
+                (self.viewport.height() - 6).max(1) as u32,
+            )
+                .into(),
+            panels: PanelId::ALL
+                .into_iter()
+                .filter(|id| !self.hidden.borrow()[id.index()])
+                .collect(),
+            focused: None,
+            attention: None,
+        };
+        let result = layout::solve(&request, self.solution.borrow().as_ref());
+        let width = (result.canvas.width + 6).max(1) as f64;
+        let height = (result.canvas.height + 6).max(1) as f64;
+        for p in &result.panels {
+            self.regions.borrow_mut()[p.panel.index()] = Region {
+                x: p.rect.x / width,
+                y: p.rect.y / height,
+                w: (p.rect.width + 6.0) / width,
+                h: (p.rect.height + 6.0) / height,
+            };
+        }
+        *self.solution.borrow_mut() = Some(result);
     }
     fn maximize(&self, index: usize) {
         self.hidden.borrow_mut()[index] = false;
@@ -321,10 +367,29 @@ impl Surface {
         self.animate();
     }
     fn layout(&self) {
-        let width = self.shell.width().max(1) as f64;
-        let height = self.shell.height().max(1) as f64;
-        self.dimensions.set((width as i32, height as i32));
+        let dimensions = (self.viewport.width(), self.viewport.height());
         let focus = self.focused.get();
+        if self.auto_layout.get()
+            && focus.is_none()
+            && !self.arranging.get()
+            && (self.dimensions.get() != dimensions || self.solution.borrow().is_none())
+        {
+            self.pack();
+        }
+        self.dimensions.set(dimensions);
+        let canvas_size = if focus.is_none() && self.auto_layout.get() {
+            self.solution
+                .borrow()
+                .as_ref()
+                .map(|s| ((s.canvas.width + 6) as i32, (s.canvas.height + 6) as i32))
+                .unwrap_or(dimensions)
+        } else {
+            dimensions
+        };
+        let width = canvas_size.0.max(1) as f64;
+        let height = canvas_size.1.max(1) as f64;
+        self.shell
+            .set_size_request(canvas_size.0.max(1), canvas_size.1.max(1));
         let transition = self.transition.borrow().clone();
         let progress = transition.as_ref().map_or(1.0, |(start, _)| {
             (start.elapsed().as_secs_f64() / 0.30).min(1.0)
@@ -474,7 +539,14 @@ pub(super) fn build(
     canvas.set_vexpand(true);
     shell.add_overlay(&canvas);
     shell.set_measure_overlay(&canvas, false);
-    console.append(&shell);
+    let viewport = gtk::ScrolledWindow::builder()
+        .child(&shell)
+        .hexpand(true)
+        .vexpand(true)
+        .hscrollbar_policy(gtk::PolicyType::Automatic)
+        .vscrollbar_policy(gtk::PolicyType::Automatic)
+        .build();
+    console.append(&viewport);
     host.add_named(&console, Some("workspace"));
     let pages: Vec<gtk::Widget> = PANELS
         .iter()
@@ -559,7 +631,10 @@ pub(super) fn build(
     }
     let overviews = (0..PANELS.len())
         .map(|i| {
-            let overview = overview::build(i, data.clone(), prefs.clone());
+            let overview = overview::build(i, data.clone(), prefs.clone(), &covers[i]);
+            overview
+                .widget
+                .update_property(&[gtk::accessible::Property::Label(PANELS[i].1)]);
             interiors[i].put(&overview.widget, 0.0, 0.0);
             overview
         })
@@ -567,6 +642,9 @@ pub(super) fn build(
     let saved = load();
     let surface = Rc::new(Surface {
         shell,
+        viewport,
+        auto_layout: Cell::new(saved.automatic),
+        solution: RefCell::new(None),
         canvas,
         background,
         regions: RefCell::new(saved.regions.clone()),
@@ -910,7 +988,7 @@ pub(super) fn build(
         };
         if s.active.get()
             && (s.transition.borrow().is_some()
-                || s.dimensions.get() != (s.shell.width(), s.shell.height()))
+                || s.dimensions.get() != (s.viewport.width(), s.viewport.height()))
         {
             s.layout();
         }
@@ -989,6 +1067,20 @@ pub(super) fn build(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn old_saved_layout_keeps_manual_arrangement_and_new_flag_roundtrips() {
+        let json = serde_json::json!({"regions": super::defaults(),"hidden":vec![false;6]});
+        let old: super::SavedLayout = serde_json::from_value(json).unwrap();
+        assert!(!old.automatic);
+        let new = super::SavedLayout {
+            automatic: true,
+            ..old
+        };
+        let decoded: super::SavedLayout =
+            serde_json::from_str(&serde_json::to_string(&new).unwrap()).unwrap();
+        assert!(decoded.automatic);
+    }
+
     use super::*;
     #[test]
     fn offscreen_and_invalid_geometry_is_recoverable() {

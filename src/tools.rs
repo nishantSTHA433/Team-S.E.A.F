@@ -29,6 +29,7 @@ pub fn speed_panel() -> (gtk::Box, gtk::Label) {
     controls.append(&start);
     controls.append(&stop);
     p.append(&controls);
+    crate::ui::adaptive_row(&controls, p.upcast_ref(), 380);
     let result = label("READY / no test has run");
     result.set_selectable(true);
     p.append(&result);
@@ -90,6 +91,7 @@ pub fn page() -> (gtk::Box, gtk::Label, gtk::TextBuffer) {
     row.append(&a);
     row.append(&b);
     calc.append(&row);
+    crate::ui::adaptive_row(&row, p.upcast_ref(), 520);
     let out = label("0");
     out.add_css_class("metric");
     out.set_selectable(true);

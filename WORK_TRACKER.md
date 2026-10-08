@@ -3,7 +3,7 @@
 Maintainer: Codex. User-visible, assistant-maintained; the user does not need to update this file. Explicit user corrections always take precedence. This file is the authoritative execution tracker; historical docs are supporting context.
 
 Authoritative location: /home/fedora/RustroverProjects/lcars-desktop/WORK_TRACKER.md
-Updated: 2026-10-07
+Updated: 2026-10-08
 
 ## Mandatory checkpoint before changes
 
@@ -31,7 +31,7 @@ Updated: 2026-10-07
 - Steps 01–03 FINALIZED. Step 03 evidence: /mnt/macos/layout03/build.log, build/strict Clippy/31 tests passed; all 64 panel subsets across eight sizes validated. Narrow overflow bug fixed before finalization.
 - Intended files: src/console.rs, src/ui.rs, src/tools.rs, src/overview.rs, docs/responsive-adapters.md; WORK_TRACKER.md.
 - Scope: adapt existing persistent widgets without rebuilding/resetting application state; preserve saved manual arrangement. No claim that Step 05 automatic task policy or Step 06 animation polish is complete.
-- Next action: inspect and adapt viewport and focused content; reflow component rows at narrow sizes; share media stream between preview/viewer; verify build and UI states.
+- Next action: Step 04c CURRENTLY WORKING ON: verify Files selection/path/scroll and running-job continuity through Console focus/home and Desktop/Console transitions. Width/height allocation and isolated input/media preservation checks passed. Then finalize Step 04 and begin Step 05 attention policy.
 - Resume: inspect /mnt/macos/responsive04/ staged changes and guest diff before reapplying. Physical touch and external app/session work remain open.
 
 ## Existing baseline — preserve, do not call final
@@ -250,3 +250,15 @@ Commit/export reference (if applicable):
 Step 03 verification update: narrow-viewport test caught avoidable 8px horizontal overflow. Restricting candidates to viewport width (or largest unavoidable single-panel minimum); then re-running full validation.
 
 2026-10-07 / Step 03 FINALIZED: solver and invariant matrix passed, 31 total tests, strict Clippy/build clean. Step 04 CURRENTLY WORKING ON: live responsive adapters and preservation.
+
+2026-10-08 / Step 04 CURRENTLY WORKING ON: access recovered after UTM input interruption. Guest audit shows only our console/ui/tools changes; LCARS process still running (was hidden, not proven crashed). Initial adapter build/Clippy/32 tests passed; four/six-panel UI observed. Installing staged accessible summaries and Network reflow, then rechecking. Remaining: narrow/focused/media preservation and final acceptance.
+
+2026-10-08 / Step 04 CURRENTLY WORKING ON: access recovered after UTM input interruption. Guest audit shows only our console/ui/tools changes; LCARS process still running (was hidden, not proven crashed). Initial adapter build/Clippy/32 tests passed; four/six-panel UI observed. Installing staged accessible summaries and Network reflow, then rechecking. Remaining: narrow/focused/media preservation and final acceptance. Added explicit GTK integration check for live resize/input retention and shared prepared media seek/pause; run with the existing test fixture.
+
+2026-10-08 / Step 04 CURRENTLY WORKING ON: access recovered after UTM input interruption. Guest audit shows only our console/ui/tools changes; LCARS process still running (was hidden, not proven crashed). Initial adapter build/Clippy/32 tests passed; four/six-panel UI observed. Installing staged accessible summaries and Network reflow, then rechecking. Remaining: narrow/focused/media preservation and final acceptance. Added explicit GTK integration check for live resize/input retention and shared prepared media seek/pause; run with the existing test fixture.
+
+2026-10-08 / Step 04d CURRENTLY WORKING ON: resumed and audited guest changes. 32 unit tests and explicit GTK input/media/page checks passed. Found 645px actual allocation for 640px requested; fixing shell minimum and adding exact allocation checks. Removed accidental terminal text inserted at tracker start during focus recovery; remaining tracker retained.
+
+Step 04 verification: shell now fits 640px exactly. The 900px portrait-height check was constrained to 777px by the VM desktop work area; changing portrait check to 740px within the real display. No app workaround for a window-manager limit.
+
+2026-10-08 / Step 04 checkpoint VERIFIED in part: fixed taskbar minimum width using a horizontally scrollable shortcut strip, keeping Start/status/clock outside it. All six pages render at exact requested 1000x720, 640x540, 800x440, 640x740, then 1000x720 dimensions. Live GTK check also retains entry values and prepared paused video seek position. Build, strict Clippy, 32 unit tests plus one explicitly run GTK integration test passed. Evidence: /mnt/macos/responsive04/verified.log. Step 04 remains CURRENTLY WORKING ON for full workflow preservation and visual acceptance; Step 05 not started.

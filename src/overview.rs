@@ -524,6 +524,69 @@ fn draw_tools(p: &Paint<'_>, source: &Sources) {
         );
     }
 }
+fn accessible_summary(index: usize, data: &InstrumentData, prefs: &Preferences) -> String {
+    match index {
+        0 => data
+            .snapshot
+            .as_ref()
+            .map(|s| {
+                format!(
+                    "CPU {:.0} percent. Memory {:.1} of {:.1} GiB. Uptime {} minutes.",
+                    s.cpu,
+                    s.memory_used as f64 / 1073741824.0,
+                    s.memory_total as f64 / 1073741824.0,
+                    s.uptime / 60
+                )
+            })
+            .unwrap_or_else(|| "Acquiring telemetry".into()),
+        1 | 3 => {
+            let source = &data.sources;
+            let entries = rows(if index == 1 {
+                &source.files_list
+            } else {
+                &source.apps_list
+            });
+            let names = entries
+                .iter()
+                .take(5)
+                .filter_map(|row| row.first())
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", ");
+            let location = if index == 1 {
+                source
+                    .files_path
+                    .as_ref()
+                    .map(|p| p.text().to_string())
+                    .unwrap_or_default()
+            } else {
+                "Installed applications".into()
+            };
+            format!(
+                "{location}. {} items. {names}. Open system for full controls.",
+                entries.len()
+            )
+        }
+        2 => format!(
+            "{}. Transfer test: {}",
+            text(&data.sources.network_status, "Checking connectivity"),
+            text(&data.sources.speed_result, "Ready")
+        ),
+        4 => format!(
+            "Calculator result {}. Open Utilities for calculator and process diagnostics.",
+            text(&data.sources.calculator, "0")
+        ),
+        _ => format!(
+            "Workspace {}. Alert sound {}. Open Preferences to configure.",
+            if prefs.workspace_mode {
+                "Console"
+            } else {
+                "Desktop"
+            },
+            if prefs.sound { "on" } else { "off" }
+        ),
+    }
+}
 pub(super) struct Overview {
     pub widget: gtk::ScrolledWindow,
     pub canvas: gtk::DrawingArea,
@@ -533,7 +596,17 @@ pub(super) fn build(
     index: usize,
     data: Rc<RefCell<InstrumentData>>,
     prefs: Rc<RefCell<Preferences>>,
+    activator: &gtk::Button,
 ) -> Overview {
+    let summary_data = data.clone();
+    let summary_prefs = prefs.clone();
+    let weak_activator = activator.downgrade();
+    let name = format!(
+        "Open {}",
+        lcars_desktop::workspace::PanelId::ALL[index].title()
+    );
+    activator.update_property(&[gtk::accessible::Property::Label(&name)]);
+    let mut last_summary = String::new();
     let widget = gtk::DrawingArea::new();
     widget.set_can_target(false);
     let offset = Rc::new(Cell::new(0));
@@ -585,6 +658,15 @@ pub(super) fn build(
         };
         if w.is_mapped() {
             w.queue_draw();
+            let summary =
+                accessible_summary(index, &summary_data.borrow(), &summary_prefs.borrow());
+            if summary != last_summary {
+                w.update_property(&[gtk::accessible::Property::Label(&summary)]);
+                if let Some(button) = weak_activator.upgrade() {
+                    button.update_property(&[gtk::accessible::Property::Description(&summary)]);
+                }
+                last_summary = summary;
+            }
         }
         glib::ControlFlow::Continue
     });
