@@ -1688,6 +1688,139 @@ mod gtk_adapter_tests {
             }
         }
         full.close();
+        workflow_continuity(&validation_app, &config);
         println!("GTK_ADAPTERS_VERIFIED: wide/narrow/wide preserves input; prepared shared video preserves seek and pause");
+    }
+    fn settle() {
+        let start = std::time::Instant::now();
+        until(|| start.elapsed() >= Duration::from_millis(400));
+    }
+    fn descendants(widget: &gtk::Widget) -> Vec<gtk::Widget> {
+        let mut out = vec![widget.clone()];
+        let mut child = widget.first_child();
+        while let Some(w) = child {
+            child = w.next_sibling();
+            out.extend(descendants(&w));
+        }
+        out
+    }
+    fn workflow_continuity(app: &gtk::Application, config: &std::path::Path) {
+        let fixture = config.join("directory-fixture");
+        std::fs::create_dir_all(&fixture).unwrap();
+        for i in 0..100 {
+            std::fs::write(
+                fixture.join(format!("sample-{i:03}.txt")),
+                "LCARS test fixture",
+            )
+            .unwrap();
+        }
+        let window = gtk::ApplicationWindow::builder()
+            .application(app)
+            .default_width(1000)
+            .default_height(720)
+            .build();
+        let data = Rc::new(RefCell::new(console::InstrumentData::default()));
+        let files = files_page(&window, &data);
+        let (tools, _, report) = crate::tools::page();
+        let pages = gtk::Stack::new();
+        for (route, _) in PANELS {
+            let page = match route {
+                "files" => scrolled(&files),
+                "tools" => scrolled(&tools),
+                _ => scrolled(&label(route, "muted")),
+            };
+            pages.add_named(&page, Some(route));
+        }
+        let prefs = Rc::new(RefCell::new(Preferences {
+            sound: false,
+            reduced_motion: true,
+            workspace_mode: false,
+        }));
+        let (host, navigate, mode) = console::build(&pages, &prefs, data.clone());
+        window.set_child(Some(&host));
+        window.present();
+        mode(true);
+        navigate("files");
+        settle();
+        let path = data.borrow().sources.files_path.clone().unwrap();
+        let list = data.borrow().sources.files_list.clone().unwrap();
+        path.set_text(&fixture.to_string_lossy());
+        path.emit_activate();
+        until(|| list.row_at_index(99).is_some());
+        let filter = descendants(files.upcast_ref())
+            .into_iter()
+            .find_map(|w| w.downcast::<gtk::SearchEntry>().ok())
+            .unwrap();
+        filter.set_text("sample-");
+        settle();
+        let selected = list.row_at_index(20).unwrap();
+        list.select_row(Some(&selected));
+        let metadata = data.borrow().sources.file_details.clone().unwrap();
+        let details = metadata.text();
+        let scroll = list
+            .ancestor(gtk::ScrolledWindow::static_type())
+            .unwrap()
+            .downcast::<gtk::ScrolledWindow>()
+            .unwrap();
+        settle();
+        scroll.vadjustment().set_value(300.0);
+        settle();
+        let position = scroll.vadjustment().value();
+        assert!(position > 0.0);
+        filter.grab_focus();
+        settle();
+        for desktop in [false, true, false] {
+            if desktop {
+                mode(false);
+                navigate("files");
+                settle();
+                mode(true);
+            } else {
+                navigate("__home");
+                settle();
+            }
+            navigate("files");
+            settle();
+            assert_eq!(path.text().as_str(), fixture.to_string_lossy().as_ref());
+            assert_eq!(filter.text(), "sample-");
+            let input = gtk::prelude::RootExt::focus(&window).expect("restored content focus");
+            assert!(
+                input.is_ancestor(&filter),
+                "last text field must regain focus (desktop transition: {desktop}), got {}",
+                input.type_().name()
+            );
+            assert_eq!(list.selected_row(), Some(selected.clone()));
+            assert_eq!(metadata.text(), details);
+            assert!(
+                (scroll.vadjustment().value() - position).abs() < 1.0,
+                "scroll position lost: {} vs {position}",
+                scroll.vadjustment().value()
+            );
+        }
+        navigate("tools");
+        settle();
+        let scan = descendants(tools.upcast_ref())
+            .into_iter()
+            .filter_map(|w| w.downcast::<gtk::Button>().ok())
+            .find(|b| b.label().as_deref() == Some("SCAN SYSTEM / PROCESS DIAGNOSTICS"))
+            .unwrap();
+        scan.emit_clicked();
+        assert!(!scan.is_sensitive());
+        navigate("__home");
+        settle();
+        mode(false);
+        navigate("files");
+        until(|| scan.is_sensitive());
+        let result = report.text(&report.start_iter(), &report.end_iter(), false);
+        assert!(result.contains("KERNEL") && result.contains("PROCESSES"));
+        mode(true);
+        navigate("tools");
+        settle();
+        assert_eq!(
+            report.text(&report.start_iter(), &report.end_iter(), false),
+            result
+        );
+        println!("WORKFLOW_CONTINUITY_VERIFIED: real Files path/filter/selection/metadata/scroll; diagnostic worker completes while hidden across modes");
+        window.close();
     }
 }

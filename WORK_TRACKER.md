@@ -27,12 +27,12 @@ Updated: 2026-10-08
 
 ## Active checkpoint
 
-- Current task: Step 04a–04e CURRENTLY WORKING ON; begin with responsive GTK adapters, safe native-size viewport integration and media-stream continuity.
-- Steps 01–03 FINALIZED. Step 03 evidence: /mnt/macos/layout03/build.log, build/strict Clippy/31 tests passed; all 64 panel subsets across eight sizes validated. Narrow overflow bug fixed before finalization.
-- Intended files: src/console.rs, src/ui.rs, src/tools.rs, src/overview.rs, docs/responsive-adapters.md; WORK_TRACKER.md.
-- Scope: adapt existing persistent widgets without rebuilding/resetting application state; preserve saved manual arrangement. No claim that Step 05 automatic task policy or Step 06 animation polish is complete.
-- Next action: Step 04c CURRENTLY WORKING ON: verify Files selection/path/scroll and running-job continuity through Console focus/home and Desktop/Console transitions. Width/height allocation and isolated input/media preservation checks passed. Then finalize Step 04 and begin Step 05 attention policy.
-- Resume: inspect /mnt/macos/responsive04/ staged changes and guest diff before reapplying. Physical touch and external app/session work remain open.
+- Current task: Step 05a CURRENTLY WORKING ON: explicit task-demand signals for media selection, speed tests and diagnostics; automatic home packing may emphasize the active task without changing focus.
+- Steps 01–04 FINALIZED for their baseline adapter scope. Step 04 evidence: /mnt/macos/continuity04/restoration.log and final.log; 32 unit tests, strict Clippy, full GTK resize/real Files/diagnostic/input focus checks passed with fatal GTK criticals enabled.
+- Intended files: src/attention.rs, src/lib.rs, src/ui.rs, src/tools.rs, src/console.rs; docs/attention-policy.md; tracker.
+- Scope: start with automatic layouts. Manual override restoration, active-touch/typing freeze, alert policy and wider scenario validation remain Step 05b–05d before finalization. No telemetry-driven requests or focus stealing.
+- Next action: implement and test explicit task lifecycle demand and connect to automatic home solver; preserve authoritative GTK content ownership.
+- Known follow-up: Step 06 must apply reduced-motion preference to the console zoom path; tests currently wait for the actual 300 ms animation. Step 09 retains media playback/preview usability refinements; physical touch and external app validation remain open.
 
 ## Existing baseline — preserve, do not call final
 
@@ -73,7 +73,7 @@ Status: FINALIZED. Dependencies: 01, 02.
 Gate: deterministic layouts satisfy bounds, visibility, content minima and stability across a size/panel matrix.
 
 ### Step 04: Update responsive rendering and state preservation
-Status: CURRENTLY WORKING ON. Dependencies: 03.
+Status: FINALIZED. Dependencies: 03.
 - 04a: Implement compact, standard, expanded and focused compositions selected by width AND height.
 - 04b: Reflow sections/columns; preserve native readable text instead of shrinking whole pages.
 - 04c: Preserve file selection, path, search, scroll, media position, test progress and input focus.
@@ -82,7 +82,7 @@ Status: CURRENTLY WORKING ON. Dependencies: 03.
 Gate: every system works in narrow/wide/short/tall/focused rectangles with state retained.
 
 ### Step 05: Add automatic attention and space allocation
-Status: NOT STARTED. Dependencies: 03, 04.
+Status: CURRENTLY WORKING ON. Dependencies: 03, 04.
 - 05a: Expand for selected media, diagnostics, speed test and text input; keep supporting context useful.
 - 05b: Release temporary space and restore prior composition when the task ends.
 - 05c: Freeze geometry around active touches/typing; routine telemetry must not move windows.
@@ -262,3 +262,9 @@ Step 03 verification update: narrow-viewport test caught avoidable 8px horizonta
 Step 04 verification: shell now fits 640px exactly. The 900px portrait-height check was constrained to 777px by the VM desktop work area; changing portrait check to 740px within the real display. No app workaround for a window-manager limit.
 
 2026-10-08 / Step 04 checkpoint VERIFIED in part: fixed taskbar minimum width using a horizontally scrollable shortcut strip, keeping Start/status/clock outside it. All six pages render at exact requested 1000x720, 640x540, 800x440, 640x740, then 1000x720 dimensions. Live GTK check also retains entry values and prepared paused video seek position. Build, strict Clippy, 32 unit tests plus one explicitly run GTK integration test passed. Evidence: /mnt/macos/responsive04/verified.log. Step 04 remains CURRENTLY WORKING ON for full workflow preservation and visual acceptance; Step 05 not started.
+
+2026-10-08 / Step 04c CURRENTLY WORKING ON: full Console/ Desktop transition regression using actual Files and Utilities widgets; verify selection/path/filter/scroll and read-only diagnostic job completion while hidden. Fix any state losses before Step 05. Scope src/ui.rs, src/console.rs, docs/responsive-adapters.md.
+
+Step 04c: real Files and diagnostic continuity passed. Fixing transient negative width before allocation, and retaining/restoring last content input on focus/home and mode transitions; adding focus regression.
+
+2026-10-08 / Step 04 FINALIZED: real Files path/filter/selection/metadata/scroll retained across focus/home and Desktop/Console transitions; background read-only diagnostics completes and survives mode changes. Added text-input memory/restore after transitions and cleared focus before reparenting; fixed pre-allocation negative width. GTK integration passes without warnings/criticals. User screenshot target and full final journey matrix remain future acceptance, not claimed complete. Step 05a CURRENTLY WORKING ON as above.

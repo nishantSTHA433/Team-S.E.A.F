@@ -238,6 +238,8 @@ struct Surface {
     covers: Vec<gtk::Button>,
     handles: Vec<gtk::Button>,
     focused: Cell<Option<usize>>,
+    input_memory: RefCell<Vec<Option<glib::WeakRef<gtk::Widget>>>>,
+    restored_input: Cell<Option<usize>>,
     selected: Cell<usize>,
     arranging: Cell<bool>,
     active: Cell<bool>,
@@ -258,6 +260,38 @@ struct Surface {
     drop_hover: Cell<Option<usize>>,
 }
 impl Surface {
+    fn remember_input(&self) {
+        if self.active.get() && self.focused.get() != self.restored_input.get() {
+            return;
+        }
+        let Some(root) = self.shell.root() else {
+            return;
+        };
+        let Some(input) = gtk::prelude::RootExt::focus(&root) else {
+            return;
+        };
+        if !input.is::<gtk::Text>() && !input.is::<gtk::Entry>() && !input.is::<gtk::SearchEntry>()
+        {
+            return;
+        }
+        for (i, page) in self.pages.iter().enumerate() {
+            if input.is_ancestor(page) && input.is_sensitive() && input.is_mapped() {
+                self.input_memory.borrow_mut()[i] = Some(input.downgrade());
+                break;
+            }
+        }
+    }
+
+    fn suspend_input(&self) {
+        self.remember_input();
+        if let Some(root) = self.shell.root() {
+            if gtk::prelude::RootExt::focus(&root)
+                .is_some_and(|input| self.pages.iter().any(|page| input.is_ancestor(page)))
+            {
+                gtk::prelude::RootExt::set_focus(&root, None::<&gtk::Widget>);
+            }
+        }
+    }
     fn persist(&self) {
         self.status.set_text(&match save(
             &self.regions.borrow(),
@@ -269,6 +303,8 @@ impl Surface {
         });
     }
     fn toggle_arrange(&self) {
+        self.suspend_input();
+        self.restored_input.set(None);
         let on = !self.arranging.get();
         self.arranging.set(on);
         if on {
@@ -290,6 +326,8 @@ impl Surface {
         self.animate();
     }
     fn home(&self) {
+        self.suspend_input();
+        self.restored_input.set(None);
         self.focused.set(None);
         if self.auto_layout.get() {
             self.pack();
@@ -348,6 +386,8 @@ impl Surface {
         *self.solution.borrow_mut() = Some(result);
     }
     fn maximize(&self, index: usize) {
+        self.suspend_input();
+        self.restored_input.set(None);
         self.hidden.borrow_mut()[index] = false;
         self.arranging.set(false);
         self.sync_controls();
@@ -357,6 +397,8 @@ impl Surface {
         self.animate();
     }
     fn minimize(&self, index: usize) {
+        self.suspend_input();
+        self.restored_input.set(None);
         self.hidden.borrow_mut()[index] = true;
         self.focused.set(None);
         self.swap_source.set(None);
@@ -367,6 +409,7 @@ impl Surface {
         self.animate();
     }
     fn layout(&self) {
+        self.remember_input();
         let dimensions = (self.viewport.width(), self.viewport.height());
         let focus = self.focused.get();
         if self.auto_layout.get()
@@ -422,7 +465,7 @@ impl Surface {
             self.canvas.move_(&self.tiles[i], r.x * width, r.y * height);
             let content_h = (h - 52).max(1);
             let raw_w = if focus.is_some() {
-                (width - 6.0) as i32
+                (width - 6.0).max(1.0) as i32
             } else {
                 960
             };
@@ -459,6 +502,22 @@ impl Surface {
         }
         if progress >= 1.0 {
             self.transition.borrow_mut().take();
+            if let Some(i) = focus {
+                if self.restored_input.get() != Some(i) && self.pages[i].is_mapped() {
+                    if let Some(input) = self.input_memory.borrow()[i]
+                        .as_ref()
+                        .and_then(|w| w.upgrade())
+                    {
+                        if input.is_ancestor(&self.pages[i])
+                            && input.is_sensitive()
+                            && input.is_visible()
+                        {
+                            input.grab_focus();
+                        }
+                    }
+                    self.restored_input.set(Some(i));
+                }
+            }
         }
         self.background.queue_draw();
     }
@@ -657,6 +716,8 @@ pub(super) fn build(
         covers,
         handles,
         focused: Cell::new(None),
+        input_memory: RefCell::new(vec![None; PANELS.len()]),
+        restored_input: Cell::new(None),
         selected: Cell::new(0),
         arranging: Cell::new(false),
         active: Cell::new(false),
@@ -986,6 +1047,7 @@ pub(super) fn build(
         let Some(s) = weak.upgrade() else {
             return glib::ControlFlow::Break;
         };
+        s.remember_input();
         if s.active.get()
             && (s.transition.borrow().is_some()
                 || s.dimensions.get() != (s.viewport.width(), s.viewport.height()))
@@ -1022,6 +1084,21 @@ pub(super) fn build(
                 }
             } else {
                 single.set_visible_child_name(name);
+                if let Some(i) = PANELS.iter().position(|(route, _)| *route == name) {
+                    let weak = Rc::downgrade(&s);
+                    glib::idle_add_local_once(move || {
+                        if let Some(s) = weak.upgrade() {
+                            if let Some(input) = s.input_memory.borrow()[i]
+                                .as_ref()
+                                .and_then(|w| w.upgrade())
+                            {
+                                if !s.active.get() && input.is_mapped() && input.is_sensitive() {
+                                    input.grab_focus();
+                                }
+                            }
+                        }
+                    });
+                }
             }
         })
     };
@@ -1033,6 +1110,8 @@ pub(super) fn build(
             if enabled == s.active.get() {
                 return;
             }
+            s.suspend_input();
+            s.restored_input.set(None);
             if enabled {
                 for (i, page) in s.pages.iter().enumerate() {
                     single.remove(page);
