@@ -73,3 +73,61 @@ mod tests {
         assert_eq!(d.preferred(|_| true), Some(PanelId::Files));
     }
 }
+
+/// Track distinct touch sequences: ending one finger cannot release another.
+#[derive(Debug)]
+pub struct Contacts<K> {
+    touches: Vec<K>,
+    pointer: bool,
+}
+impl<K> Default for Contacts<K> {
+    fn default() -> Self {
+        Self {
+            touches: Vec::new(),
+            pointer: false,
+        }
+    }
+}
+impl<K: PartialEq> Contacts<K> {
+    pub fn begin(&mut self, key: K) {
+        if !self.touches.contains(&key) {
+            self.touches.push(key);
+        }
+    }
+    pub fn end(&mut self, key: &K) {
+        self.touches.retain(|k| k != key);
+    }
+    pub fn pointer(&mut self, down: bool) {
+        self.pointer = down;
+    }
+    pub fn active(&self) -> bool {
+        self.pointer || !self.touches.is_empty()
+    }
+    pub fn clear(&mut self) {
+        self.touches.clear();
+        self.pointer = false;
+    }
+}
+#[cfg(test)]
+mod contact_tests {
+    use super::*;
+    #[test]
+    fn all_contacts_must_end_including_pointer() {
+        let mut c = Contacts::default();
+        c.begin(1);
+        c.begin(1);
+        c.begin(2);
+        c.pointer(true);
+        c.end(&1);
+        assert!(c.active());
+        c.pointer(false);
+        assert!(c.active());
+        c.end(&2);
+        assert!(!c.active());
+        c.begin(3);
+        c.clear();
+        assert!(!c.active());
+        c.end(&3);
+        assert!(!c.active());
+    }
+}

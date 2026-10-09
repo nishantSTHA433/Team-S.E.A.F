@@ -227,7 +227,7 @@ struct Surface {
     demand: super::TaskDemand,
     attention: Cell<Option<lcars_desktop::workspace::PanelId>>,
     attention_base: RefCell<Option<(Vec<Region>, Option<lcars_desktop::layout::Solution>)>>,
-    pressing: Cell<bool>,
+    contacts: RefCell<lcars_desktop::attention::Contacts<gtk::gdk::EventSequence>>,
     shell: gtk::Overlay,
     viewport: gtk::ScrolledWindow,
     auto_layout: Cell<bool>,
@@ -269,7 +269,7 @@ impl Surface {
         if !self.active.get()
             || self.focused.get().is_some()
             || self.arranging.get()
-            || self.pressing.get()
+            || self.contacts.borrow().active()
         {
             return;
         }
@@ -281,13 +281,10 @@ impl Surface {
         {
             return;
         }
-        let next = if self.auto_layout.get() {
-            self.demand
-                .borrow()
-                .preferred(|p| !self.hidden.borrow()[p.index()])
-        } else {
-            None
-        };
+        let next = self
+            .demand
+            .borrow()
+            .preferred(|p| !self.hidden.borrow()[p.index()]);
         if next == self.attention.get() {
             return;
         }
@@ -304,7 +301,9 @@ impl Surface {
                 *self.solution.borrow_mut() = solution;
             }
         }
-        self.pack();
+        if self.auto_layout.get() || self.attention.get().is_some() {
+            self.pack();
+        }
         self.animate();
     }
 
@@ -387,7 +386,7 @@ impl Surface {
         self.suspend_input();
         self.restored_input.set(None);
         self.focused.set(None);
-        if self.auto_layout.get() {
+        if self.auto_layout.get() || self.attention.get().is_some() {
             self.pack();
         }
         self.arranging.set(false);
@@ -460,17 +459,22 @@ impl Surface {
         self.hidden.borrow_mut()[index] = true;
         self.focused.set(None);
         self.swap_source.set(None);
-        self.reflow();
+        if self.auto_layout.get() || self.attention.get().is_some() {
+            self.pack();
+        }
         self.persist();
         self.status
             .set_text("MINIMIZED / REOPEN FROM START OR THE TASKBAR");
         self.animate();
     }
     fn layout(&self) {
+        if self.contacts.borrow().active() && !self.arranging.get() {
+            return;
+        }
         self.remember_input();
         let dimensions = (self.viewport.width(), self.viewport.height());
         let focus = self.focused.get();
-        if self.auto_layout.get()
+        if (self.auto_layout.get() || self.attention.get().is_some())
             && focus.is_none()
             && !self.arranging.get()
             && (self.dimensions.get() != dimensions || self.solution.borrow().is_none())
@@ -478,15 +482,16 @@ impl Surface {
             self.pack();
         }
         self.dimensions.set(dimensions);
-        let canvas_size = if focus.is_none() && self.auto_layout.get() {
-            self.solution
-                .borrow()
-                .as_ref()
-                .map(|s| ((s.canvas.width + 6) as i32, (s.canvas.height + 6) as i32))
-                .unwrap_or(dimensions)
-        } else {
-            dimensions
-        };
+        let canvas_size =
+            if focus.is_none() && (self.auto_layout.get() || self.attention.get().is_some()) {
+                self.solution
+                    .borrow()
+                    .as_ref()
+                    .map(|s| ((s.canvas.width + 6) as i32, (s.canvas.height + 6) as i32))
+                    .unwrap_or(dimensions)
+            } else {
+                dimensions
+            };
         let width = canvas_size.0.max(1) as f64;
         let height = canvas_size.1.max(1) as f64;
         self.shell
@@ -601,7 +606,9 @@ impl Surface {
         } else {
             if self.hidden.borrow()[index] {
                 self.hidden.borrow_mut()[index] = false;
-                self.reflow();
+                if self.auto_layout.get() || self.attention.get().is_some() {
+                    self.pack();
+                }
                 self.persist();
             }
             self.maximize(index);
@@ -762,7 +769,7 @@ pub(super) fn build(
         demand: data.borrow().demand.clone(),
         attention: Cell::new(None),
         attention_base: RefCell::new(None),
-        pressing: Cell::new(false),
+        contacts: RefCell::new(Default::default()),
         shell,
         viewport,
         auto_layout: Cell::new(saved.automatic),
@@ -799,27 +806,32 @@ pub(super) fn build(
         swap_source: Cell::new(None),
         drop_hover: Cell::new(None),
     });
-    let press = gtk::GestureClick::new();
-    press.set_propagation_phase(gtk::PropagationPhase::Capture);
+    let contacts = gtk::EventControllerLegacy::new();
+    contacts.set_propagation_phase(gtk::PropagationPhase::Capture);
     let weak = Rc::downgrade(&surface);
-    press.connect_pressed(move |_, _, _, _| {
+    contacts.connect_event(move |_, event| {
         if let Some(s) = weak.upgrade() {
-            s.pressing.set(true);
+            use gtk::gdk::EventType;
+            let mut contacts = s.contacts.borrow_mut();
+            match event.event_type() {
+                EventType::TouchBegin => contacts.begin(event.event_sequence()),
+                EventType::TouchEnd | EventType::TouchCancel => {
+                    contacts.end(&event.event_sequence())
+                }
+                EventType::ButtonPress => contacts.pointer(true),
+                EventType::ButtonRelease => contacts.pointer(false),
+                _ => {}
+            }
+        }
+        glib::Propagation::Proceed
+    });
+    host.add_controller(contacts);
+    let weak = Rc::downgrade(&surface);
+    host.connect_unmap(move |_| {
+        if let Some(s) = weak.upgrade() {
+            s.contacts.borrow_mut().clear();
         }
     });
-    let weak = Rc::downgrade(&surface);
-    press.connect_released(move |_, _, _, _| {
-        if let Some(s) = weak.upgrade() {
-            s.pressing.set(false);
-        }
-    });
-    let weak = Rc::downgrade(&surface);
-    press.connect_cancel(move |_, _| {
-        if let Some(s) = weak.upgrade() {
-            s.pressing.set(false);
-        }
-    });
-    host.add_controller(press);
     let weak = Rc::downgrade(&surface);
     glib::timeout_add_local(std::time::Duration::from_millis(200), move || {
         let Some(s) = weak.upgrade() else {

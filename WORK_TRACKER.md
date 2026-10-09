@@ -27,12 +27,12 @@ Updated: 2026-10-08
 
 ## Active checkpoint
 
-- Current task: Step 05a CURRENTLY WORKING ON: explicit task-demand signals for media selection, speed tests and diagnostics; automatic home packing may emphasize the active task without changing focus.
-- Steps 01–04 FINALIZED for their baseline adapter scope. Step 04 evidence: /mnt/macos/continuity04/restoration.log and final.log; 32 unit tests, strict Clippy, full GTK resize/real Files/diagnostic/input focus checks passed with fatal GTK criticals enabled.
-- Intended files: src/attention.rs, src/lib.rs, src/ui.rs, src/tools.rs, src/console.rs; docs/attention-policy.md; tracker.
-- Scope: start with automatic layouts. Manual override restoration, active-touch/typing freeze, alert policy and wider scenario validation remain Step 05b–05d before finalization. No telemetry-driven requests or focus stealing.
-- Next action: Step 05b–05d: complete manual baseline restoration and multi-contact freeze/queued demand, verify alerts do not trigger focus/layout changes. Step 06 follows after this gate.
-- Known follow-up: Step 06 must apply reduced-motion preference to the console zoom path; tests currently wait for the actual 300 ms animation. Step 09 retains media playback/preview usability refinements; physical touch and external app validation remain open.
+- Current task: Step 06a–06d CURRENTLY WORKING ON: coordinated zoom/emblem bounds, interrupted/reversed motion, reduced motion and hit testing.
+- Steps 01–05 FINALIZED for implemented guest baseline. Evidence: attention05/final.log; 35 unit tests plus explicit GTK workflow/layout checks, strict Clippy/build. Real physical touch acceptance remains Step 14; guest has no touchscreen/OSK exposed (Step 02).
+- Intended files: src/console.rs, src/ui.rs integration checks, docs/motion.md, WORK_TRACKER.md.
+- Scope: honor reduced-motion preference, continue reversals from displayed geometry, pause/rebase motion during held contacts, align input availability and emblem interpolation. Do not claim Step 08 final emblem styling or Step 19 visual polish.
+- Next action: inspect and update existing 300 ms transition, test rapid focus/home/focus and reduced-motion mode; inspect actual Fedora visuals.
+- Known later work: keyboard occlusion binding when real OSK/touch provider exists (14); actual disconnect/reconnect and speed-test validation (11); original cursor issue final acceptance (17).
 
 ## Existing baseline — preserve, do not call final
 
@@ -82,7 +82,7 @@ Status: FINALIZED. Dependencies: 03.
 Gate: every system works in narrow/wide/short/tall/focused rectangles with state retained.
 
 ### Step 05: Add automatic attention and space allocation
-Status: CURRENTLY WORKING ON. Dependencies: 03, 04.
+Status: FINALIZED. Dependencies: 03, 04.
 - 05a: Expand for selected media, diagnostics, speed test and text input; keep supporting context useful.
 - 05b: Release temporary space and restore prior composition when the task ends.
 - 05c: Freeze geometry around active touches/typing; routine telemetry must not move windows.
@@ -90,7 +90,7 @@ Status: CURRENTLY WORKING ON. Dependencies: 03, 04.
 Gate: actions produce useful space automatically with no repeated oscillation or unnecessary manual arrangement.
 
 ### Step 06: Finalize coordinated motion and hit testing
-Status: NOT STARTED. Dependencies: 04, 05.
+Status: CURRENTLY WORKING ON. Dependencies: 04, 05.
 - 06a: Animate bounds, content transitions and emblem together; prototype 200–350 ms timing, then measure.
 - 06b: Support interruption/reversal from current geometry; clip all moving content correctly.
 - 06c: Keep touch targets aligned; hidden systems receive no input.
@@ -270,3 +270,5 @@ Step 04c: real Files and diagnostic continuity passed. Fixing transient negative
 2026-10-08 / Step 04 FINALIZED: real Files path/filter/selection/metadata/scroll retained across focus/home and Desktop/Console transitions; background read-only diagnostics completes and survives mode changes. Added text-input memory/restore after transitions and cleared focus before reparenting; fixed pre-allocation negative width. GTK integration passes without warnings/criticals. User screenshot target and full final journey matrix remain future acceptance, not claimed complete. Step 05a CURRENTLY WORKING ON as above.
 
 2026-10-08 / Step 05a VERIFIED: explicit preview/transfer/diagnostic demand wired to automatic solver; most-recent active task, no telemetry trigger, no focus stealing. Baseline restoration and real GTK enlargement/restoration passed; 34 unit tests, strict Clippy/build and GTK check pass. Evidence /mnt/macos/attention05/build.log. Step 05b–05d CURRENTLY WORKING ON: restore manual composition, multi-contact input freeze and queued updates, alert noninterference; then Step 06 reduced motion and coordinated transitions. Scope console.rs, attention.rs, ui.rs tests and docs.
+
+2026-10-08 / Step 05 FINALIZED: explicit demand; temporary enlargement in automatic and manual layouts; baseline restored on completion/Arrange; saved geometry excludes temporary emphasis; minimized systems stay hidden. Distinct touch sequences and pointer holds defer automatic geometry; text focus defers attention; manual Arrange drag stays enabled. Latest eligible demand applies after release. Alerts reviewed: update banner/notifications without focus/attention requests; actual network transition tests remain 11. 35 unit tests and GTK automatic/manual restoration + focus/Files/diagnostic continuity pass. Step 06 CURRENTLY WORKING ON.

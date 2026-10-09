@@ -1867,6 +1867,28 @@ mod gtk_adapter_tests {
         demand
             .borrow_mut()
             .set(lcars_desktop::attention::Task::Transfer, false);
+        navigate("__home");
+        settle();
+        navigate("__arrange");
+        settle();
+        navigate("__arrange");
+        settle();
+        let manual = (tile.width(), tile.height());
+        demand
+            .borrow_mut()
+            .set(lcars_desktop::attention::Task::Preview, true);
+        settle();
+        settle();
+        demand
+            .borrow_mut()
+            .set(lcars_desktop::attention::Task::Preview, false);
+        settle();
+        settle();
+        assert_eq!(
+            (tile.width(), tile.height()),
+            manual,
+            "manual composition survives temporary attention"
+        );
         println!("ATTENTION_ADAPTER_VERIFIED: temporary media space restores baseline; background task leaves focused Files visible");
         println!("WORKFLOW_CONTINUITY_VERIFIED: real Files path/filter/selection/metadata/scroll; diagnostic worker completes while hidden across modes");
         window.close();
