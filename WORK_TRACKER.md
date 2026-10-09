@@ -27,12 +27,11 @@ Updated: 2026-10-08
 
 ## Active checkpoint
 
-- Current task: Step 06a–06d CURRENTLY WORKING ON: coordinated zoom/emblem bounds, interrupted/reversed motion, reduced motion and hit testing.
-- Steps 01–05 FINALIZED for implemented guest baseline. Evidence: attention05/final.log; 35 unit tests plus explicit GTK workflow/layout checks, strict Clippy/build. Real physical touch acceptance remains Step 14; guest has no touchscreen/OSK exposed (Step 02).
-- Intended files: src/console.rs, src/ui.rs integration checks, docs/motion.md, WORK_TRACKER.md.
-- Scope: honor reduced-motion preference, continue reversals from displayed geometry, pause/rebase motion during held contacts, align input availability and emblem interpolation. Do not claim Step 08 final emblem styling or Step 19 visual polish.
-- Next action: inspect and update existing 300 ms transition, test rapid focus/home/focus and reduced-motion mode; inspect actual Fedora visuals.
-- Known later work: keyboard occlusion binding when real OSK/touch provider exists (14); actual disconnect/reconnect and speed-test validation (11); original cursor issue final acceptance (17).
+- Current task: Step 07a–07c CURRENTLY WORKING ON: consolidate the accumulated stylesheet into a reference-led palette/type/rail/control system; apply across content, menus and dialogs.
+- Steps 01–06 FINALIZED for the implemented guest baseline. Step 06 evidence: motion06/settings.log; 36 unit tests and explicit GTK stress/workflow checks, build/strict Clippy passed. Fresh home and focused Files visually inspected. Hardware touch/cursor/performance final matrix remains 14/17/20.
+- Intended files: assets/lcars.css, src/ui.rs, docs/visual-system.md; WORK_TRACKER.md.
+- Scope: keep compact header/Exit, open-sided rails, single-touch target sizes; improve native-text readability and remove stale development details from the user Preferences screen. Do not declare screenshot polish complete before final comparison.
+- Next action: consolidate style rules, verify GTK CSS parsing and viewport matrix, inspect home/focused/menu/settings visually.
 
 ## Existing baseline — preserve, do not call final
 
@@ -90,7 +89,7 @@ Status: FINALIZED. Dependencies: 03, 04.
 Gate: actions produce useful space automatically with no repeated oscillation or unnecessary manual arrangement.
 
 ### Step 06: Finalize coordinated motion and hit testing
-Status: CURRENTLY WORKING ON. Dependencies: 04, 05.
+Status: FINALIZED. Dependencies: 04, 05.
 - 06a: Animate bounds, content transitions and emblem together; prototype 200–350 ms timing, then measure.
 - 06b: Support interruption/reversal from current geometry; clip all moving content correctly.
 - 06c: Keep touch targets aligned; hidden systems receive no input.
@@ -98,7 +97,7 @@ Status: CURRENTLY WORKING ON. Dependencies: 04, 05.
 Gate: no stale frames, detached controls, input leaks or lost state during stress sequences.
 
 ### Step 07: Build and apply the unified LCARS visual system
-Status: NOT STARTED. Dependencies: 04, 06.
+Status: CURRENTLY WORKING ON. Dependencies: 04, 06.
 - 07a: Consolidate palette, fonts, type hierarchy, rails, curved elbows, caps, segments, icons and interaction states.
 - 07b: Replace conflicting accumulated CSS and generic closed boxes with coherent open-sided structures.
 - 07c: Apply styling to home, focused systems, menus, dialogs, lists and error states.
@@ -272,3 +271,9 @@ Step 04c: real Files and diagnostic continuity passed. Fixing transient negative
 2026-10-08 / Step 05a VERIFIED: explicit preview/transfer/diagnostic demand wired to automatic solver; most-recent active task, no telemetry trigger, no focus stealing. Baseline restoration and real GTK enlargement/restoration passed; 34 unit tests, strict Clippy/build and GTK check pass. Evidence /mnt/macos/attention05/build.log. Step 05b–05d CURRENTLY WORKING ON: restore manual composition, multi-contact input freeze and queued updates, alert noninterference; then Step 06 reduced motion and coordinated transitions. Scope console.rs, attention.rs, ui.rs tests and docs.
 
 2026-10-08 / Step 05 FINALIZED: explicit demand; temporary enlargement in automatic and manual layouts; baseline restored on completion/Arrange; saved geometry excludes temporary emphasis; minimized systems stay hidden. Distinct touch sequences and pointer holds defer automatic geometry; text focus defers attention; manual Arrange drag stays enabled. Latest eligible demand applies after release. Alerts reviewed: update banner/notifications without focus/attention requests; actual network transition tests remain 11. 35 unit tests and GTK automatic/manual restoration + focus/Files/diagnostic continuity pass. Step 06 CURRENTLY WORKING ON.
+
+2026-10-08 / Step 06 IMPLEMENTED; automated verification passed: 36 unit tests, strict Clippy/build and GTK rapid reversal/reduced-motion/hidden-target assertions, plus previous workflow/attention matrix. Evidence motion06/build.log. CURRENTLY WORKING ON visual launch/focus/home inspection before finalization.
+
+Step 06 visual review: home and focused Files render correctly in fresh guest build; pointer coordinates in UTM can lag, so keyboard navigation supplements visual checks (hardware/input audit remains 17). Adding the missing visible reduced-motion preference before closing this step; existing saved choice retained.
+
+2026-10-08 / Step 06 FINALIZED: panel bounds/opacity and emblem bounds/opacity share 300 ms eased timing; reverse from displayed geometry, pause/rebase for contacts, clip content and disable moving/hidden input. Reduced motion is instant and exposed in Preferences with persistence test. GTK stress switches every 60 ms and verifies final Files state/hidden-target exclusion; all prior checks pass. Home/focused Files inspected in fresh app. Step 07 CURRENTLY WORKING ON.

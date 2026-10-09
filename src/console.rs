@@ -223,6 +223,22 @@ fn save(regions: &[Region], hidden: &[bool], automatic: bool) -> Result<(), Stri
     std::fs::write(&temp, bytes).map_err(|e| e.to_string())?;
     std::fs::rename(temp, path).map_err(|e| e.to_string())
 }
+#[derive(Clone)]
+struct Motion {
+    started: std::time::Instant,
+    regions: Vec<Region>,
+    opacity: Vec<f64>,
+    emblem: Region,
+    emblem_opacity: f64,
+    emblem_target: Region,
+}
+fn motion_progress(elapsed: f64, reduced: bool) -> f64 {
+    if reduced {
+        1.0
+    } else {
+        (elapsed / 0.30).clamp(0.0, 1.0)
+    }
+}
 struct Surface {
     demand: super::TaskDemand,
     attention: Cell<Option<lcars_desktop::workspace::PanelId>>,
@@ -256,7 +272,11 @@ struct Surface {
     advanced: Cell<bool>,
     hidden: RefCell<Vec<bool>>,
     shown: RefCell<Vec<Region>>,
-    transition: RefCell<Option<(std::time::Instant, Vec<Region>)>>,
+    transition: RefCell<Option<Motion>>,
+    paused_at: Cell<Option<std::time::Instant>>,
+    preferences: Rc<RefCell<Preferences>>,
+    emblem_shown: Cell<Region>,
+    emblem_opacity: Cell<f64>,
     mode_picker: gtk::DropDown,
     edits: gtk::Box,
     arrange_button: gtk::Button,
@@ -402,9 +422,32 @@ impl Surface {
         self.arrange_button
             .set_label(if arranging { "DONE" } else { "ARRANGE" });
     }
+    fn emblem_target(&self) -> Region {
+        logo_region(
+            &self
+                .regions
+                .borrow()
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| !self.hidden.borrow()[*i])
+                .map(|(_, r)| *r)
+                .collect::<Vec<_>>(),
+        )
+    }
     fn animate(&self) {
-        *self.transition.borrow_mut() =
-            Some((std::time::Instant::now(), self.shown.borrow().clone()));
+        self.paused_at.set(None);
+        *self.transition.borrow_mut() = if self.preferences.borrow().reduced_motion {
+            None
+        } else {
+            Some(Motion {
+                started: std::time::Instant::now(),
+                regions: self.shown.borrow().clone(),
+                opacity: self.tiles.iter().map(|tile| tile.opacity()).collect(),
+                emblem: self.emblem_shown.get(),
+                emblem_opacity: self.emblem_opacity.get(),
+                emblem_target: self.emblem_target(),
+            })
+        };
         self.layout();
     }
     fn reflow(&self) {
@@ -469,7 +512,15 @@ impl Surface {
     }
     fn layout(&self) {
         if self.contacts.borrow().active() && !self.arranging.get() {
+            if self.transition.borrow().is_some() && self.paused_at.get().is_none() {
+                self.paused_at.set(Some(std::time::Instant::now()));
+            }
             return;
+        }
+        if let Some(paused) = self.paused_at.take() {
+            if let Some(motion) = self.transition.borrow_mut().as_mut() {
+                motion.started += paused.elapsed();
+            }
         }
         self.remember_input();
         let dimensions = (self.viewport.width(), self.viewport.height());
@@ -497,14 +548,24 @@ impl Surface {
         self.shell
             .set_size_request(canvas_size.0.max(1), canvas_size.1.max(1));
         let transition = self.transition.borrow().clone();
-        let progress = transition.as_ref().map_or(1.0, |(start, _)| {
-            (start.elapsed().as_secs_f64() / 0.30).min(1.0)
+        let progress = transition.as_ref().map_or(1.0, |motion| {
+            motion_progress(
+                motion.started.elapsed().as_secs_f64(),
+                self.preferences.borrow().reduced_motion,
+            )
         });
         let ease = progress * progress * (3.0 - 2.0 * progress);
         for (i, (_, title)) in PANELS.iter().enumerate() {
-            let visible = !self.hidden.borrow()[i] && focus.is_none_or(|f| i == f);
+            let target_visible = !self.hidden.borrow()[i] && focus.is_none_or(|f| i == f);
+            let target_opacity = if target_visible { 1.0 } else { 0.0 };
+            let opacity = transition.as_ref().map_or(target_opacity, |motion| {
+                motion.opacity[i] + (target_opacity - motion.opacity[i]) * ease
+            });
+            let visible = target_visible || opacity > 0.001;
+            self.tiles[i].set_opacity(opacity);
             self.tiles[i].set_visible(visible);
-            self.tiles[i].set_can_target(visible);
+            self.tiles[i].set_can_target(target_visible && progress >= 1.0);
+            self.pages[i].set_can_target(focus == Some(i) && target_visible && progress >= 1.0);
             if !visible {
                 continue;
             }
@@ -518,27 +579,27 @@ impl Surface {
             } else {
                 self.regions.borrow()[i]
             };
-            let r = transition
-                .as_ref()
-                .map_or(target, |(_, from)| interpolate(from[i], target, ease));
+            let r = transition.as_ref().map_or(target, |motion| {
+                interpolate(motion.regions[i], target, ease)
+            });
             self.shown.borrow_mut()[i] = r;
             let w = (r.w * width - 6.0).max(100.0) as i32;
             let h = (r.h * height - 6.0).max(80.0) as i32;
             self.tiles[i].set_size_request(w, h);
             self.canvas.move_(&self.tiles[i], r.x * width, r.y * height);
             let content_h = (h - 52).max(1);
-            let raw_w = if focus.is_some() {
+            let raw_w = if focus == Some(i) {
                 (width - 6.0).max(1.0) as i32
             } else {
                 960
             };
-            let raw_h = if focus.is_some() {
+            let raw_h = if focus == Some(i) {
                 (height - 58.0).max(1.0) as i32
             } else {
                 ((960.0 * content_h as f64 / w as f64) as i32).max(1)
             };
-            self.pages[i].set_visible(focus.is_some());
-            self.overviews[i].widget.set_visible(focus.is_none());
+            self.pages[i].set_visible(focus == Some(i));
+            self.overviews[i].widget.set_visible(focus != Some(i));
             self.overviews[i].widget.set_size_request(w, content_h);
             self.pages[i].set_size_request(raw_w, raw_h);
             let interactive = focus == Some(i) && progress >= 1.0;
@@ -563,6 +624,15 @@ impl Surface {
                 self.tiles[i].remove_css_class("arrange-selected");
             }
         }
+        let emblem_opacity = if focus.is_none() { 1.0 } else { 0.0 };
+        self.emblem_shown.set(transition.as_ref().map_or_else(
+            || self.emblem_target(),
+            |motion| interpolate(motion.emblem, motion.emblem_target, ease),
+        ));
+        self.emblem_opacity
+            .set(transition.as_ref().map_or(emblem_opacity, |motion| {
+                motion.emblem_opacity + (emblem_opacity - motion.emblem_opacity) * ease
+            }));
         if progress >= 1.0 {
             self.transition.borrow_mut().take();
             if let Some(i) = focus {
@@ -799,6 +869,10 @@ pub(super) fn build(
         advanced: Cell::new(false),
         hidden: RefCell::new(saved.hidden),
         transition: RefCell::new(None),
+        paused_at: Cell::new(None),
+        preferences: prefs.clone(),
+        emblem_shown: Cell::new(logo_region(&[])),
+        emblem_opacity: Cell::new(1.0),
         mode_picker: mode_picker.clone(),
         edits: edits.clone(),
         arrange_button: arrange.clone(),
@@ -843,18 +917,11 @@ pub(super) fn build(
     let weak = Rc::downgrade(&surface);
     surface.background.set_draw_func(move |area, cr, w, h| {
         let Some(s) = weak.upgrade() else { return };
-        if s.focused.get().is_some() {
+        let opacity = s.emblem_opacity.get();
+        if opacity <= 0.001 {
             return;
         }
-        let visible = s
-            .shown
-            .borrow()
-            .iter()
-            .enumerate()
-            .filter(|(i, _)| !s.hidden.borrow()[*i])
-            .map(|(_, r)| *r)
-            .collect::<Vec<_>>();
-        let gap = logo_region(&visible);
+        let gap = s.emblem_shown.get();
         let x = gap.x * w as f64 + 5.0;
         let y = gap.y * h as f64 + 5.0;
         let width = (gap.w * w as f64 - 10.0).max(1.0);
@@ -869,6 +936,7 @@ pub(super) fn build(
         if scale < 0.15 {
             return;
         }
+        cr.push_group();
         let _ = cr.save();
         cr.translate(
             x + (width - design_w * scale) / 2.0,
@@ -910,6 +978,8 @@ pub(super) fn build(
             }
         }
         let _ = cr.restore();
+        let _ = cr.pop_group_to_source();
+        let _ = cr.paint_with_alpha(opacity);
     });
     for index in 0..PANELS.len() {
         let scroll = gtk::EventControllerScroll::new(gtk::EventControllerScrollFlags::VERTICAL);
@@ -1250,6 +1320,13 @@ pub(super) fn build(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn motion_duration_clamps_and_reduced_motion_finishes_immediately() {
+        assert_eq!(motion_progress(0.0, false), 0.0);
+        assert_eq!(motion_progress(0.15, false), 0.5);
+        assert_eq!(motion_progress(0.9, false), 1.0);
+        assert_eq!(motion_progress(0.0, true), 1.0);
+    }
     #[test]
     fn old_saved_layout_keeps_manual_arrangement_and_new_flag_roundtrips() {
         let json = serde_json::json!({"regions": super::defaults(),"hidden":vec![false;6]});

@@ -772,6 +772,22 @@ fn settings_page(prefs: &Rc<RefCell<Preferences>>) -> gtk::Box {
         });
     });
     p.append(&sound);
+    let motion = gtk::CheckButton::with_label(
+        "Reduce motion — use instant transitions instead of animated zoom",
+    );
+    motion.set_height_request(56);
+    motion.set_active(prefs.borrow().reduced_motion);
+    let config = prefs.clone();
+    let feedback = result.clone();
+    motion.connect_toggled(move |toggle| {
+        let mut cfg = config.borrow_mut();
+        cfg.reduced_motion = toggle.is_active();
+        feedback.set_text(&match cfg.save() {
+            Ok(()) => "Motion preference saved".into(),
+            Err(e) => format!("Could not save: {e}"),
+        });
+    });
+    p.append(&motion);
     p.append(&label("Touch a system to zoom in; touch its title again to return home. Arrange offers Basic swaps and Advanced move/resize. F11 toggles fullscreen; Escape dismisses Start first. Exit returns to Fedora.", "strip"));
     p.append(&result);
     p.append(&label("DEVELOPMENT BASELINE", "eyebrow"));
@@ -1697,6 +1713,15 @@ mod gtk_adapter_tests {
                 println!("PAGE_RENDERED {route}: requested={width}x{height}, actual={}x{}, content={}x{}",full.width(),full.height(),page.width(),page.height());
             }
         }
+        let motion_toggle = descendants(full.upcast_ref())
+            .into_iter()
+            .filter_map(|w| w.downcast::<gtk::CheckButton>().ok())
+            .find(|b| b.label().is_some_and(|s| s.starts_with("Reduce motion")))
+            .expect("visible motion preference");
+        motion_toggle.set_active(false);
+        assert!(!Preferences::load().reduced_motion);
+        motion_toggle.set_active(true);
+        assert!(Preferences::load().reduced_motion);
         full.close();
         workflow_continuity(&validation_app, &config);
         println!("GTK_ADAPTERS_VERIFIED: wide/narrow/wide preserves input; prepared shared video preserves seek and pause");
@@ -1889,6 +1914,37 @@ mod gtk_adapter_tests {
             manual,
             "manual composition survives temporary attention"
         );
+        prefs.borrow_mut().reduced_motion = false;
+        for route in [
+            "files", "__home", "tools", "files", "__home", "network", "files",
+        ] {
+            navigate(route);
+            let start = std::time::Instant::now();
+            until(|| start.elapsed() >= Duration::from_millis(60));
+        }
+        settle();
+        assert!(files.is_mapped());
+        for panel in descendants(host.upcast_ref())
+            .into_iter()
+            .filter(|w| w.widget_name().starts_with("lcars-panel-"))
+        {
+            assert_eq!(
+                panel.can_target(),
+                panel.widget_name() == "lcars-panel-files",
+                "hidden or moving panels must not accept input"
+            );
+        }
+        prefs.borrow_mut().reduced_motion = true;
+        navigate("__home");
+        assert!(tile.can_target(), "reduced motion has no animation delay");
+        navigate("files");
+        assert!(
+            tile.can_target(),
+            "reduced-motion focus is immediately interactive"
+        );
+        settle();
+        assert_eq!(filter.text(), "sample-");
+        println!("MOTION_VERIFIED: rapid reversals retain Files state; hidden panels cannot receive input; reduced motion finishes immediately");
         println!("ATTENTION_ADAPTER_VERIFIED: temporary media space restores baseline; background task leaves focused Files visible");
         println!("WORKFLOW_CONTINUITY_VERIFIED: real Files path/filter/selection/metadata/scroll; diagnostic worker completes while hidden across modes");
         window.close();
