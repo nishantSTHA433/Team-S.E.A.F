@@ -31,7 +31,7 @@ Updated: 2026-10-08
 - Steps 01–04 FINALIZED for their baseline adapter scope. Step 04 evidence: /mnt/macos/continuity04/restoration.log and final.log; 32 unit tests, strict Clippy, full GTK resize/real Files/diagnostic/input focus checks passed with fatal GTK criticals enabled.
 - Intended files: src/attention.rs, src/lib.rs, src/ui.rs, src/tools.rs, src/console.rs; docs/attention-policy.md; tracker.
 - Scope: start with automatic layouts. Manual override restoration, active-touch/typing freeze, alert policy and wider scenario validation remain Step 05b–05d before finalization. No telemetry-driven requests or focus stealing.
-- Next action: implement and test explicit task lifecycle demand and connect to automatic home solver; preserve authoritative GTK content ownership.
+- Next action: Step 05b–05d: complete manual baseline restoration and multi-contact freeze/queued demand, verify alerts do not trigger focus/layout changes. Step 06 follows after this gate.
 - Known follow-up: Step 06 must apply reduced-motion preference to the console zoom path; tests currently wait for the actual 300 ms animation. Step 09 retains media playback/preview usability refinements; physical touch and external app validation remain open.
 
 ## Existing baseline — preserve, do not call final
@@ -268,3 +268,5 @@ Step 04 verification: shell now fits 640px exactly. The 900px portrait-height ch
 Step 04c: real Files and diagnostic continuity passed. Fixing transient negative width before allocation, and retaining/restoring last content input on focus/home and mode transitions; adding focus regression.
 
 2026-10-08 / Step 04 FINALIZED: real Files path/filter/selection/metadata/scroll retained across focus/home and Desktop/Console transitions; background read-only diagnostics completes and survives mode changes. Added text-input memory/restore after transitions and cleared focus before reparenting; fixed pre-allocation negative width. GTK integration passes without warnings/criticals. User screenshot target and full final journey matrix remain future acceptance, not claimed complete. Step 05a CURRENTLY WORKING ON as above.
+
+2026-10-08 / Step 05a VERIFIED: explicit preview/transfer/diagnostic demand wired to automatic solver; most-recent active task, no telemetry trigger, no focus stealing. Baseline restoration and real GTK enlargement/restoration passed; 34 unit tests, strict Clippy/build and GTK check pass. Evidence /mnt/macos/attention05/build.log. Step 05b–05d CURRENTLY WORKING ON: restore manual composition, multi-contact input freeze and queued updates, alert noninterference; then Step 06 reduced motion and coordinated transitions. Scope console.rs, attention.rs, ui.rs tests and docs.

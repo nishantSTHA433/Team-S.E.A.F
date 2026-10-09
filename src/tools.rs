@@ -1,4 +1,5 @@
 use gtk::{glib, prelude::*};
+use lcars_desktop::attention::Task;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     mpsc, Arc,
@@ -17,7 +18,7 @@ fn button(s: &str) -> gtk::Button {
     b
 }
 
-pub fn speed_panel() -> (gtk::Box, gtk::Label) {
+pub fn speed_panel(demand: crate::ui::TaskDemand) -> (gtk::Box, gtk::Label) {
     let p = gtk::Box::new(gtk::Orientation::Vertical, 10);
     p.add_css_class("card");
     p.append(&label("SUBSPACE TRANSFER / SPEED TEST"));
@@ -40,6 +41,7 @@ pub fn speed_panel() -> (gtk::Box, gtk::Label) {
     });
     let summary = result.clone();
     start.connect_clicked(move |b| {
+        demand.borrow_mut().set(Task::Transfer, true);
         b.set_sensitive(false);
         stop.set_sensitive(true);
         cancel.store(false, Ordering::Relaxed);
@@ -55,9 +57,11 @@ pub fn speed_panel() -> (gtk::Box, gtk::Label) {
         let b = b.clone();
         let stop = stop.clone();
         let result = result.clone();
+        let demand = demand.clone();
         glib::timeout_add_local(Duration::from_millis(100), move || {
             while let Ok(message) = rx.try_recv() {
                 if let Some(done) = message.strip_prefix("DONE ") {
+                    demand.borrow_mut().set(Task::Transfer, false);
                     result.set_text(done);
                     b.set_sensitive(true);
                     stop.set_sensitive(false);
@@ -71,7 +75,7 @@ pub fn speed_panel() -> (gtk::Box, gtk::Label) {
     (p, summary)
 }
 
-pub fn page() -> (gtk::Box, gtk::Label, gtk::TextBuffer) {
+pub fn page(demand: crate::ui::TaskDemand) -> (gtk::Box, gtk::Label, gtk::TextBuffer) {
     let p = gtk::Box::new(gtk::Orientation::Vertical, 14);
     p.set_margin_start(24);
     p.set_margin_end(24);
@@ -134,6 +138,7 @@ pub fn page() -> (gtk::Box, gtk::Label, gtk::TextBuffer) {
     p.append(&scroll);
     let summary = output.buffer();
     refresh.connect_clicked(move |b| {
+        demand.borrow_mut().set(Task::Diagnostics, true);
         b.set_sensitive(false);
         let (tx, rx) = mpsc::channel();
         std::thread::spawn(move || {
@@ -161,8 +166,10 @@ pub fn page() -> (gtk::Box, gtk::Label, gtk::TextBuffer) {
         });
         let b = b.clone();
         let output = output.clone();
+        let demand = demand.clone();
         glib::timeout_add_local(Duration::from_millis(150), move || {
             if let Ok(s) = rx.try_recv() {
+                demand.borrow_mut().set(Task::Diagnostics, false);
                 output.buffer().set_text(&s);
                 b.set_sensitive(true);
                 glib::ControlFlow::Break

@@ -11,6 +11,7 @@ mod overview;
 #[derive(Default)]
 pub(super) struct InstrumentData {
     pub(super) sources: overview::Sources,
+    pub(super) demand: super::TaskDemand,
     snapshot: Option<services::Snapshot>,
     history: std::collections::VecDeque<f64>,
     traffic: std::collections::VecDeque<(f64, f64)>,
@@ -223,6 +224,10 @@ fn save(regions: &[Region], hidden: &[bool], automatic: bool) -> Result<(), Stri
     std::fs::rename(temp, path).map_err(|e| e.to_string())
 }
 struct Surface {
+    demand: super::TaskDemand,
+    attention: Cell<Option<lcars_desktop::workspace::PanelId>>,
+    attention_base: RefCell<Option<(Vec<Region>, Option<lcars_desktop::layout::Solution>)>>,
+    pressing: Cell<bool>,
     shell: gtk::Overlay,
     viewport: gtk::ScrolledWindow,
     auto_layout: Cell<bool>,
@@ -260,6 +265,49 @@ struct Surface {
     drop_hover: Cell<Option<usize>>,
 }
 impl Surface {
+    fn update_attention(&self) {
+        if !self.active.get()
+            || self.focused.get().is_some()
+            || self.arranging.get()
+            || self.pressing.get()
+        {
+            return;
+        }
+        if self
+            .shell
+            .root()
+            .and_then(|r| gtk::prelude::RootExt::focus(&r))
+            .is_some_and(|w| w.is::<gtk::Text>())
+        {
+            return;
+        }
+        let next = if self.auto_layout.get() {
+            self.demand
+                .borrow()
+                .preferred(|p| !self.hidden.borrow()[p.index()])
+        } else {
+            None
+        };
+        if next == self.attention.get() {
+            return;
+        }
+        if self.attention.get().is_none() && next.is_some() {
+            *self.attention_base.borrow_mut() = Some((
+                self.regions.borrow().clone(),
+                self.solution.borrow().clone(),
+            ));
+        }
+        self.attention.set(next);
+        if next.is_none() {
+            if let Some((regions, solution)) = self.attention_base.borrow_mut().take() {
+                *self.regions.borrow_mut() = regions;
+                *self.solution.borrow_mut() = solution;
+            }
+        }
+        self.pack();
+        self.animate();
+    }
+
     fn remember_input(&self) {
         if self.active.get() && self.focused.get() != self.restored_input.get() {
             return;
@@ -294,7 +342,12 @@ impl Surface {
     }
     fn persist(&self) {
         self.status.set_text(&match save(
-            &self.regions.borrow(),
+            &self
+                .attention_base
+                .borrow()
+                .as_ref()
+                .map(|(r, _)| r.clone())
+                .unwrap_or_else(|| self.regions.borrow().clone()),
             &self.hidden.borrow(),
             self.auto_layout.get(),
         ) {
@@ -308,6 +361,11 @@ impl Surface {
         let on = !self.arranging.get();
         self.arranging.set(on);
         if on {
+            self.attention.set(None);
+            if let Some((regions, solution)) = self.attention_base.borrow_mut().take() {
+                *self.regions.borrow_mut() = regions;
+                *self.solution.borrow_mut() = solution;
+            }
             self.auto_layout.set(false);
         }
         self.focused.set(None);
@@ -370,7 +428,7 @@ impl Surface {
                 .filter(|id| !self.hidden.borrow()[id.index()])
                 .collect(),
             focused: None,
-            attention: None,
+            attention: self.attention.get(),
         };
         let result = layout::solve(&request, self.solution.borrow().as_ref());
         let width = (result.canvas.width + 6).max(1) as f64;
@@ -619,8 +677,9 @@ pub(super) fn build(
     let mut handles = Vec::new();
     let mut maximizers = Vec::new();
     let mut minimizers = Vec::new();
-    for (_, title) in PANELS {
+    for (route, title) in PANELS {
         let tile = gtk::Overlay::new();
+        tile.set_widget_name(&format!("lcars-panel-{route}"));
         tile.add_css_class("console-region");
         tile.set_overflow(gtk::Overflow::Hidden);
         let bounds = gtk::DrawingArea::new();
@@ -700,6 +759,10 @@ pub(super) fn build(
         .collect();
     let saved = load();
     let surface = Rc::new(Surface {
+        demand: data.borrow().demand.clone(),
+        attention: Cell::new(None),
+        attention_base: RefCell::new(None),
+        pressing: Cell::new(false),
         shell,
         viewport,
         auto_layout: Cell::new(saved.automatic),
@@ -735,6 +798,35 @@ pub(super) fn build(
         command: command.clone(),
         swap_source: Cell::new(None),
         drop_hover: Cell::new(None),
+    });
+    let press = gtk::GestureClick::new();
+    press.set_propagation_phase(gtk::PropagationPhase::Capture);
+    let weak = Rc::downgrade(&surface);
+    press.connect_pressed(move |_, _, _, _| {
+        if let Some(s) = weak.upgrade() {
+            s.pressing.set(true);
+        }
+    });
+    let weak = Rc::downgrade(&surface);
+    press.connect_released(move |_, _, _, _| {
+        if let Some(s) = weak.upgrade() {
+            s.pressing.set(false);
+        }
+    });
+    let weak = Rc::downgrade(&surface);
+    press.connect_cancel(move |_, _| {
+        if let Some(s) = weak.upgrade() {
+            s.pressing.set(false);
+        }
+    });
+    host.add_controller(press);
+    let weak = Rc::downgrade(&surface);
+    glib::timeout_add_local(std::time::Duration::from_millis(200), move || {
+        let Some(s) = weak.upgrade() else {
+            return glib::ControlFlow::Break;
+        };
+        s.update_attention();
+        glib::ControlFlow::Continue
     });
     let weak = Rc::downgrade(&surface);
     surface.background.set_draw_func(move |area, cr, w, h| {

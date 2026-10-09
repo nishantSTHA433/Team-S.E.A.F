@@ -1,3 +1,4 @@
+pub(crate) type TaskDemand = Rc<RefCell<lcars_desktop::attention::Demand>>;
 fn draw_emblem(_: &gtk::DrawingArea, cr: &gtk::cairo::Context, w: i32, h: i32) {
     let cx = w as f64 / 2.0;
     let cy = h as f64 / 2.0;
@@ -478,7 +479,8 @@ pub fn build(app: &gtk::Application) {
     let (network_page, network_status) = network_page(&console_data);
     stack.add_named(&scrolled(&network_page), Some("network"));
     stack.add_named(&scrolled(&applications_page(&console_data)), Some("apps"));
-    let (tools_page, calculator, diagnostics) = crate::tools::page();
+    let (tools_page, calculator, diagnostics) =
+        crate::tools::page(console_data.borrow().demand.clone());
     console_data.borrow_mut().sources.calculator = Some(calculator);
     console_data.borrow_mut().sources.diagnostics = Some(diagnostics);
     stack.add_named(&scrolled(&tools_page), Some("tools"));
@@ -537,6 +539,7 @@ pub fn build(app: &gtk::Application) {
     let indicator = label("● CHECKING NETWORK", "status");
     indicator.set_ellipsize(gtk::pango::EllipsizeMode::End);
     indicator.set_max_width_chars(22);
+    indicator.set_width_chars(22);
     let clock = label("", "console-clock");
     let start = start_menu(navigate_panel.clone());
     footer.append(&start);
@@ -847,7 +850,7 @@ fn network_page(data: &Rc<RefCell<console::InstrumentData>>) -> (gtk::Box, gtk::
         }
     });
     p.append(&launch_message);
-    let (speed_panel, speed_result) = crate::tools::speed_panel();
+    let (speed_panel, speed_result) = crate::tools::speed_panel(data.borrow().demand.clone());
     data.borrow_mut().sources.speed_result = Some(speed_result);
     p.append(&speed_panel);
     (p, status)
@@ -1052,7 +1055,7 @@ fn load_directory(
 }
 
 type PreviewUpdate = Rc<dyn Fn(Option<PathBuf>)>;
-fn media_preview(window: &gtk::ApplicationWindow) -> (gtk::Box, PreviewUpdate) {
+fn media_preview(window: &gtk::ApplicationWindow, demand: TaskDemand) -> (gtk::Box, PreviewUpdate) {
     let panel = column(8);
     panel.add_css_class("preview-panel");
     panel.append(&label("MEDIA PREVIEW", "instrument-title"));
@@ -1142,6 +1145,9 @@ fn media_preview(window: &gtk::ApplicationWindow) -> (gtk::Box, PreviewUpdate) {
     });
     picture.add_controller(click);
     let update = Rc::new(move |path: Option<PathBuf>| {
+        demand
+            .borrow_mut()
+            .set(lcars_desktop::attention::Task::Preview, false);
         let request = generation.get().wrapping_add(1);
         generation.set(request);
         picture.set_paintable(None::<&gtk::gdk::Paintable>);
@@ -1157,6 +1163,10 @@ fn media_preview(window: &gtk::ApplicationWindow) -> (gtk::Box, PreviewUpdate) {
         let Some(path) = path else { return };
         let (content_type, _) = gio::content_type_guess(Some(&path), &[]);
         let mime = gio::content_type_get_mime_type(&content_type).unwrap_or_default();
+        demand.borrow_mut().set(
+            lcars_desktop::attention::Task::Preview,
+            mime.starts_with("video/") || mime.starts_with("image/"),
+        );
         if mime.starts_with("video/") {
             video.set_file(Some(&gio::File::for_path(&path)));
             video.set_visible(true);
@@ -1317,7 +1327,7 @@ fn files_page(
     let detail = column(12);
     detail.set_width_request(220);
     detail.add_css_class("card");
-    let (preview, update_preview) = media_preview(window);
+    let (preview, update_preview) = media_preview(window, data.borrow().demand.clone());
     detail.append(&preview);
     detail.append(&label("SELECTION DETAILS", "instrument-title"));
     let metadata = label("Select a file or folder.", "muted");
@@ -1721,7 +1731,7 @@ mod gtk_adapter_tests {
             .build();
         let data = Rc::new(RefCell::new(console::InstrumentData::default()));
         let files = files_page(&window, &data);
-        let (tools, _, report) = crate::tools::page();
+        let (tools, _, report) = crate::tools::page(data.borrow().demand.clone());
         let pages = gtk::Stack::new();
         for (route, _) in PANELS {
             let page = match route {
@@ -1820,6 +1830,44 @@ mod gtk_adapter_tests {
             report.text(&report.start_iter(), &report.end_iter(), false),
             result
         );
+        navigate("__auto");
+        settle();
+        let tile = descendants(host.upcast_ref())
+            .into_iter()
+            .find(|w| w.widget_name() == "lcars-panel-files")
+            .unwrap();
+        let baseline = (tile.width(), tile.height());
+        let demand = data.borrow().demand.clone();
+        demand
+            .borrow_mut()
+            .set(lcars_desktop::attention::Task::Preview, true);
+        settle();
+        settle();
+        assert!(
+            tile.width() * tile.height() > baseline.0 * baseline.1,
+            "selected media should receive additional area"
+        );
+        demand
+            .borrow_mut()
+            .set(lcars_desktop::attention::Task::Preview, false);
+        settle();
+        settle();
+        assert_eq!(
+            (tile.width(), tile.height()),
+            baseline,
+            "ending attention restores automatic composition"
+        );
+        navigate("files");
+        settle();
+        demand
+            .borrow_mut()
+            .set(lcars_desktop::attention::Task::Transfer, true);
+        settle();
+        assert!(files.is_mapped(), "background task must not steal focus");
+        demand
+            .borrow_mut()
+            .set(lcars_desktop::attention::Task::Transfer, false);
+        println!("ATTENTION_ADAPTER_VERIFIED: temporary media space restores baseline; background task leaves focused Files visible");
         println!("WORKFLOW_CONTINUITY_VERIFIED: real Files path/filter/selection/metadata/scroll; diagnostic worker completes while hidden across modes");
         window.close();
     }
