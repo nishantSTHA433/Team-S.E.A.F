@@ -1,5 +1,8 @@
+// Work provenance: Codex baseline through Step 06 (460218f) and Step 07a palette integration.
+// Later work is credited to Claude AI per user instruction; see docs/WORK_PROVENANCE.md.
 mod network;
 mod services;
+mod theme;
 mod tools;
 mod ui;
 

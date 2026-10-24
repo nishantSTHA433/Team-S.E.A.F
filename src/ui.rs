@@ -1,3 +1,6 @@
+// Mixed provenance: Codex baseline; Claude AI continuation (user-attributed): emblem,
+// Files detail pane, structured network findings and app-return refinements.
+// See docs/WORK_PROVENANCE.md for boundaries and verification qualifications.
 pub(crate) type TaskDemand = Rc<RefCell<lcars_desktop::attention::Demand>>;
 fn draw_emblem(_: &gtk::DrawingArea, cr: &gtk::cairo::Context, w: i32, h: i32) {
     let cx = w as f64 / 2.0;
@@ -5,7 +8,8 @@ fn draw_emblem(_: &gtk::DrawingArea, cr: &gtk::cairo::Context, w: i32, h: i32) {
     cr.set_source_rgb(0.03, 0.03, 0.15);
     cr.arc(cx, cy, 52.0, 0.0, std::f64::consts::TAU);
     let _ = cr.fill();
-    cr.set_source_rgb(0.67, 0.63, 0.82);
+    let (r, g, b) = crate::theme::rgb(crate::theme::LILAC);
+    cr.set_source_rgb(r, g, b);
     cr.set_line_width(2.0);
     cr.arc(cx, cy, 54.0, 0.0, std::f64::consts::TAU);
     let _ = cr.stroke();
@@ -22,7 +26,8 @@ fn draw_emblem(_: &gtk::DrawingArea, cr: &gtk::cairo::Context, w: i32, h: i32) {
         let _ = cr.fill();
     }
     // Paired leaf silhouettes frame the star field without raster scaling artifacts.
-    cr.set_source_rgb(0.67, 0.66, 0.77);
+    let (r, g, b) = crate::theme::rgb(crate::theme::MUTED);
+    cr.set_source_rgb(r, g, b);
     for side in [-1.0, 1.0] {
         for i in 0..9 {
             let a = -1.05 + i as f64 * 0.24;
@@ -289,7 +294,7 @@ fn start_menu(navigate: Navigate) -> gtk::MenuButton {
 
 pub fn build(app: &gtk::Application) {
     let css = gtk::CssProvider::new();
-    css.load_from_data(include_str!("../assets/lcars.css"));
+    css.load_from_data(&crate::theme::stylesheet());
     gtk::style_context_add_provider_for_display(
         &gtk::gdk::Display::default().expect("Display required"),
         &css,
@@ -790,10 +795,8 @@ fn settings_page(prefs: &Rc<RefCell<Preferences>>) -> gtk::Box {
     p.append(&motion);
     p.append(&label("Touch a system to zoom in; touch its title again to return home. Arrange offers Basic swaps and Advanced move/resize. F11 toggles fullscreen; Escape dismisses Start first. Exit returns to Fedora.", "strip"));
     p.append(&result);
-    p.append(&label("DEVELOPMENT BASELINE", "eyebrow"));
-    p.append(&label("Rust 1.98.1 • GTK 4.10 / gtk4-rs 0.9\nFedora 38 is end-of-life. Migrate to a supported Fedora release before deployment.\nThis is a desktop application; GNOME continues to manage windows and your session.", "muted"));
-    p.append(&label("VALIDATION STILL REQUIRED", "eyebrow"));
-    p.append(&label("Physical touchscreen and on-screen keyboard • real PC sensors • x86-64 build • audio alert on actual hardware • desktop-session integration", "muted"));
+    p.append(&label("STATION CONFIGURATION", "eyebrow"));
+    p.append(&label("Layout, motion and alert preferences are stored on this station. Use Exit in the top rail to return to Fedora.", "muted"));
     p
 }
 
@@ -822,9 +825,15 @@ fn network_page(data: &Rc<RefCell<console::InstrumentData>>) -> (gtk::Box, gtk::
         "ADAPTERS / ROUTES / NAME RESOLUTION",
         "instrument-title",
     ));
-    let report_scroll = scrolled(&output);
-    report_scroll.set_min_content_height(230);
+    let findings = column(10);
+    let report_scroll = scrolled(&findings);
+    report_scroll.set_min_content_height(140);
     p.append(&report_scroll);
+    let idle = label(
+        "Run diagnostics to inspect adapters, addresses, routes and DNS. No connection will be changed.",
+        "muted",
+    );
+    findings.append(&idle);
     diagnose.connect_clicked(move |b| {
         b.set_sensitive(false);
         output.buffer().set_text("Collecting diagnostics…");
@@ -834,9 +843,30 @@ fn network_page(data: &Rc<RefCell<console::InstrumentData>>) -> (gtk::Box, gtk::
         });
         let out = output.clone();
         let b = b.clone();
+        let findings = findings.clone();
         glib::timeout_add_local(Duration::from_millis(150), move || match rx.try_recv() {
             Ok(text) => {
                 out.buffer().set_text(&text);
+                let devices = services::parse_devices(
+                    &services::command(
+                        "nmcli",
+                        &[
+                            "-t",
+                            "-f",
+                            "DEVICE,TYPE,STATE,CONNECTION",
+                            "device",
+                            "status",
+                        ],
+                    )
+                    .unwrap_or_default(),
+                );
+                let addrs = services::parse_addresses(
+                    &services::command("ip", &["-brief", "address"]).unwrap_or_default(),
+                );
+                let routes = services::command("ip", &["route"]).unwrap_or_default();
+                let dns = services::command("nmcli", &["-g", "IP4.DNS,IP6.DNS", "device", "show"])
+                    .unwrap_or_default();
+                render_network_findings(&findings, &devices, &addrs, &routes, &dns);
                 b.set_sensitive(true);
                 glib::ControlFlow::Break
             }
@@ -884,6 +914,19 @@ fn applications_page(data: &Rc<RefCell<console::InstrumentData>>) -> gtk::Box {
     let message = label("Select an application to launch it.", "muted");
     data.borrow_mut().sources.apps_status = Some(message.clone());
     p.append(&message);
+    // 15b: native apps own their own windows, so the supported integration is an
+    // explicit record of what was started and a reliable way back to the console.
+    let running = label("No applications started from this console yet.", "muted");
+    let back = button("RETURN TO CONSOLE", "primary");
+    back.connect_clicked(|b| {
+        if let Some(w) = b.root().and_then(|r| r.downcast::<gtk::Window>().ok()) {
+            w.present();
+        }
+    });
+    let launch_bar = row(10);
+    launch_bar.append(&back);
+    launch_bar.append(&running);
+    p.append(&launch_bar);
     let list = gtk::ListBox::new();
     list.set_selection_mode(gtk::SelectionMode::None);
     list.add_css_class("directory");
@@ -895,14 +938,17 @@ fn applications_page(data: &Rc<RefCell<console::InstrumentData>>) -> gtk::Box {
         apps.into_iter()
             .map(|a| {
                 let name = a.display_name().to_string();
-                let b = button(&format!("▰   {name}"), "app-tile");
+                let b = button(&name, "app-tile");
                 b.set_tooltip_text(a.description().as_deref());
                 let msg = message.clone();
+                let started = running.clone();
+                let started_name = name.clone();
                 b.connect_clicked(
                     move |_| match a.launch(&[], None::<&gio::AppLaunchContext>) {
-                        Ok(()) => msg.set_text(
-                            "Application launched. Use the Fedora window switcher to return.",
-                        ),
+                        Ok(()) => {
+                            msg.set_text("Application launched in its own Fedora window.");
+                            started.set_text(&format!("LAST STARTED / {started_name}"));
+                        }
                         Err(e) => msg.set_text(&format!("Launch failed: {e}")),
                     },
                 );
@@ -1016,7 +1062,8 @@ fn load_directory(
                             icon.set_content_height(24);
                             let directory = item.directory;
                             icon.set_draw_func(move |_, c, _, _| {
-                                c.set_source_rgb(1.0, 0.73, 0.25);
+                                let (ir, ig, ib) = crate::theme::rgb(crate::theme::AMBER);
+                                c.set_source_rgb(ir, ig, ib);
                                 c.rectangle(2.0, 7.0, 25.0, 14.0);
                                 if directory {
                                     c.rectangle(2.0, 3.0, 11.0, 5.0);
@@ -1071,6 +1118,81 @@ fn load_directory(
 }
 
 type PreviewUpdate = Rc<dyn Fn(Option<PathBuf>)>;
+fn net_cell(text: &str, class: &str, width: i32) -> gtk::Label {
+    let l = label(text, class);
+    l.set_xalign(0.0);
+    l.set_ellipsize(gtk::pango::EllipsizeMode::End);
+    if width > 0 {
+        l.set_width_request(width);
+    }
+    l
+}
+/// 11d wants structured adapter, route and name-resolution findings, not a dump.
+fn render_network_findings(
+    into: &gtk::Box,
+    devices: &[services::NetDevice],
+    addrs: &[(String, String, String)],
+    routes: &str,
+    dns: &str,
+) {
+    while let Some(c) = into.first_child() {
+        into.remove(&c);
+    }
+    let adapters = column(4);
+    adapters.add_css_class("card");
+    adapters.append(&label("ADAPTERS", "instrument-title"));
+    let head = row(10);
+    head.add_css_class("file-headings");
+    for (t, w) in [
+        ("DEVICE", 120),
+        ("TYPE", 110),
+        ("STATE", 190),
+        ("CONNECTION", 200),
+    ] {
+        head.append(&net_cell(t, "table-heading", w));
+    }
+    adapters.append(&head);
+    for d in devices {
+        let r = row(10);
+        r.append(&net_cell(&d.device, "file-row", 120));
+        r.append(&net_cell(&d.kind, "muted", 110));
+        r.append(&net_cell(&d.state, "status", 190));
+        r.append(&net_cell(&d.connection, "muted", 200));
+        adapters.append(&r);
+    }
+    if devices.is_empty() {
+        adapters.append(&net_cell("No adapters reported.", "muted", 0));
+    }
+    into.append(&adapters);
+
+    let address = column(4);
+    address.add_css_class("card");
+    address.append(&label("ADDRESSES", "instrument-title"));
+    for (iface, state, list) in addrs {
+        let r = row(10);
+        r.append(&net_cell(iface, "file-row", 120));
+        r.append(&net_cell(state, "status", 110));
+        r.append(&net_cell(list, "muted", 0));
+        address.append(&r);
+    }
+    into.append(&address);
+
+    for (title, body) in [("ROUTES", routes), ("NAME RESOLUTION", dns)] {
+        let sec = column(4);
+        sec.add_css_class("card");
+        sec.append(&label(title, "instrument-title"));
+        let text = body.trim();
+        sec.append(&label(
+            if text.is_empty() {
+                "Not reported."
+            } else {
+                text
+            },
+            "muted",
+        ));
+        into.append(&sec);
+    }
+}
 fn media_preview(window: &gtk::ApplicationWindow, demand: TaskDemand) -> (gtk::Box, PreviewUpdate) {
     let panel = column(8);
     panel.add_css_class("preview-panel");
@@ -1355,9 +1477,19 @@ fn files_page(
     let trash = button("MOVE TO TRASH", "danger");
     open.set_sensitive(false);
     trash.set_sensitive(false);
-    detail.append(&open);
-    detail.append(&trash);
-    content.append(&detail);
+    // 04d: inspection scrolls when the viewport is short, but the destructive and
+    // primary actions stay pinned in view instead of falling below the fold.
+    let detail_scroll = gtk::ScrolledWindow::new();
+    detail_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
+    detail_scroll.set_vexpand(true);
+    detail_scroll.set_child(Some(&detail));
+    let detail_column = column(12);
+    detail_column.set_width_request(220);
+    detail_column.set_hexpand(false);
+    detail_column.append(&detail_scroll);
+    detail_column.append(&open);
+    detail_column.append(&trash);
+    content.append(&detail_column);
     p.append(&content);
     adaptive_row(&content, p.upcast_ref(), 700);
     let entries: Rc<RefCell<Vec<FileItem>>> = Rc::new(RefCell::new(Vec::new()));
@@ -1592,6 +1724,18 @@ mod gtk_adapter_tests {
     #[ignore = "requires active Fedora display and LCARS_MEDIA_FIXTURE; run explicitly"]
     fn gtk_adapters_preserve_input_and_shared_video_stream() {
         gtk::init().expect("GTK display required for adapter validation");
+        let style = gtk::CssProvider::new();
+        let errors = Rc::new(RefCell::new(Vec::new()));
+        let captured = errors.clone();
+        style.connect_parsing_error(move |_, _, error| {
+            captured.borrow_mut().push(error.to_string())
+        });
+        style.load_from_data(&crate::theme::stylesheet());
+        assert!(
+            errors.borrow().is_empty(),
+            "GTK CSS errors: {:?}",
+            errors.borrow()
+        );
         let validation_app = gtk::Application::builder()
             .application_id("org.lcars.AdapterCheck")
             .build();

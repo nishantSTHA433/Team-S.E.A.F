@@ -1,3 +1,5 @@
+// Mixed provenance: Codex overview baseline; Claude AI continuation (user-attributed)
+// refined open-sided instruments and reference styling. See docs/WORK_PROVENANCE.md.
 //! Home instruments lay out at native pixels. No full-page thumbnail scaling.
 use super::InstrumentData;
 use crate::services::Preferences;
@@ -19,9 +21,10 @@ pub(in crate::ui) struct Sources {
     pub calculator: Option<gtk::Label>,
     pub diagnostics: Option<gtk::TextBuffer>,
 }
-const AMBER: (f64, f64, f64) = (1.0, 0.79, 0.37);
-const LILAC: (f64, f64, f64) = (0.71, 0.66, 0.87);
-const CORAL: (f64, f64, f64) = (0.82, 0.47, 0.52);
+const AMBER: (f64, f64, f64) = crate::theme::rgb(crate::theme::AMBER);
+const LILAC: (f64, f64, f64) = crate::theme::rgb(crate::theme::LILAC);
+const CORAL: (f64, f64, f64) = crate::theme::rgb(crate::theme::CORAL);
+const RULE: (f64, f64, f64) = crate::theme::rgb(crate::theme::RULE);
 const INK: (f64, f64, f64) = (0.0, 0.0, 0.0);
 struct Paint<'a> {
     cr: &'a cairo::Context,
@@ -39,7 +42,7 @@ impl Paint<'_> {
             return;
         }
         self.cr.select_font_face(
-            "Nimbus Sans Narrow",
+            crate::theme::FONT,
             cairo::FontSlant::Normal,
             cairo::FontWeight::Bold,
         );
@@ -69,7 +72,7 @@ impl Paint<'_> {
     fn lines(&self, y: f64, text: &str, size: f64, max_lines: usize) {
         let available = self.width - 20.0;
         self.cr.select_font_face(
-            "Nimbus Sans Narrow",
+            crate::theme::FONT,
             cairo::FontSlant::Normal,
             cairo::FontWeight::Bold,
         );
@@ -277,24 +280,17 @@ fn draw_system(p: &Paint<'_>, data: &InstrumentData) {
     );
     let graph_h = ((p.height - 180.0) * 0.45).max(28.0);
     let gy = 70.0;
-    for i in 0..=3 {
+    for i in 1..=2 {
         p.rect(
-            10.0,
+            14.0,
             gy + graph_h * i as f64 / 3.0,
-            p.width - 20.0,
+            p.width - 24.0,
             1.0,
-            (0.20, 0.16, 0.25),
+            RULE,
         );
     }
-    for i in 0..=8 {
-        p.rect(
-            10.0 + (p.width - 20.0) * i as f64 / 8.0,
-            gy,
-            1.0,
-            graph_h,
-            (0.12, 0.10, 0.16),
-        );
-    }
+    p.rect(10.0, gy, 3.0, graph_h, LILAC);
+    p.rect(10.0, gy + graph_h, p.width - 20.0, 2.0, LILAC);
     p.cr.set_source_rgb(LILAC.0, LILAC.1, LILAC.2);
     p.cr.set_line_width(1.5);
     for (i, value) in data.history.iter().enumerate() {
@@ -334,22 +330,25 @@ fn draw_system(p: &Paint<'_>, data: &InstrumentData) {
         );
         let gauge_w = (cell_w * 0.56).clamp(18.0, 56.0);
         let gx = x + (cell_w - 10.0 - gauge_w) * 0.5;
-        p.rect(gx, top + 26.0, gauge_w, bar_h, CORAL);
-        p.rect(gx + 1.0, top + 27.0, gauge_w - 2.0, bar_h - 2.0, INK);
-        if let Some(v) = value {
-            let fill = bar_h * v.clamp(0.0, 100.0) / 100.0;
-            p.rect(
-                gx + 2.0,
-                top + 26.0 + bar_h - fill,
-                gauge_w - 4.0,
-                (fill - 2.0).max(0.0),
-                if i == 0 { AMBER } else { CORAL },
-            );
-        }
-        for tick in 1..5 {
-            let ty = top + 26.0 + bar_h * tick as f64 / 5.0;
-            p.rect(gx - 4.0, ty, 4.0, 1.0, LILAC);
-            p.rect(gx + gauge_w, ty, 4.0, 1.0, LILAC);
+        let gy0 = top + 26.0;
+        // Open-sided instrument: a spine and a foot, never an enclosing outline.
+        p.rect(gx - 6.0, gy0, 3.0, bar_h, LILAC);
+        p.rect(gx - 6.0, gy0 + bar_h, gauge_w + 6.0, 3.0, LILAC);
+        let segments = ((bar_h / 9.0).floor() as usize).clamp(4, 14);
+        let seg_h = (bar_h - 2.0 * (segments - 1) as f64) / segments as f64;
+        let lit = value
+            .map(|v| (v.clamp(0.0, 100.0) / 100.0 * segments as f64).round() as usize)
+            .unwrap_or(0);
+        for seg in 0..segments {
+            let sy = gy0 + bar_h - (seg as f64 + 1.0) * seg_h - seg as f64 * 2.0;
+            let color = if seg >= lit {
+                RULE
+            } else if i == 0 {
+                AMBER
+            } else {
+                CORAL
+            };
+            p.rect(gx, sy, gauge_w, seg_h, color);
         }
         p.text(x, top + bar_h + 45.0, 16.0, cell_w - 4.0, name, LILAC);
     }

@@ -1,204 +1,100 @@
-* { font-family: "DejaVu Sans", sans-serif; font-size: 14px; }
-window { background: #07090d; color: #e2dce9; }
-.masthead { background: #080a0e; padding: 16px 22px 12px; border-bottom: 12px solid #eab187; }
-.brand { color: #eab187; font-size: 34px; font-weight: 900; letter-spacing: 3px; }
-.masthead-sub { color: #b6a6ce; font-size: 10px; letter-spacing: 2px; }
-.rail { background: #07090d; padding: 0 8px 12px 16px; border-right: 10px solid #eab187; border-top-right-radius: 44px; }
-.rail-cap { background: #eab187; color: #101019; padding: 28px 14px; border-bottom-left-radius: 48px; font-size: 20px; font-weight: 900; }
-.rail-footer { color: #9b8ab4; font-size: 12px; padding: 20px 12px; }
-button { background: #b0a0d1; color: #0b0b12; border: none; border-radius: 24px; padding: 9px 18px; font-weight: 800; box-shadow: none; }
-button:hover { background: #e9cfb8; }
-button:active { background: #fff0dc; }
-button:focus-visible, entry:focus { outline: 3px solid #f5e7c7; outline-offset: 2px; }
-button:disabled { opacity: 0.38; }
-.nav { border-radius: 24px 0 0 24px; background: #aa91c4; font-size: 11px; padding: 12px 10px; }
-.nav.selected { background: #f1b984; }
-.nav:nth-child(3) { background: #c1a9d9; }
-.primary { background: #edb285; }
-.secondary { background: #ad9dce; }
-.danger { background: #da9298; }
-.compact { min-height: 24px; font-size: 10px; padding: 4px 14px; background: #202331; color: #dbd1e8; }
-.page-title { color: #eeb78c; font-size: 22px; font-weight: 800; letter-spacing: 2px; }
-.muted { color: #9f9bb0; font-size: 12px; }
-.hero { font-size: 38px; font-weight: 900; color: #c8b8e6; letter-spacing: 1px; }
-.system-id { background: #202230; border-left: 8px solid #b79ed3; padding: 18px; color: #c7b3df; font-size: 13px; }
-.card { background: #141620; border-radius: 6px 28px 6px 6px; border-top: 5px solid #ad96c7; padding: 18px; }
-.eyebrow { color: #b9a4d4; font-size: 11px; font-weight: 800; letter-spacing: 1px; }
-.metric { color: #f2c29a; font-size: 28px; font-weight: 800; }
-progressbar trough { background: #292b3b; border: none; min-height: 8px; border-radius: 4px; }
-progressbar progress { background: #eab187; border: none; min-height: 8px; border-radius: 4px; }
-.strip { color: #d4c1e3; background: #181a25; border-left: 7px solid #eab187; padding: 16px; font-size: 13px; }
-.footer { padding: 12px 22px; background: #151720; border-top: 5px solid #b199cb; }
-.status { color: #b2cfbf; font-weight: 800; font-size: 12px; }
-.warning { color: #ff9797; }
-entry, searchentry { background: #1b1e2a; color: #e4dcee; border: 1px solid #454158; border-radius: 8px; padding: 10px; }
-.directory { background: #10121a; border-radius: 8px; }
-.directory row { border-bottom: 1px solid #242532; }
-.directory row:selected { background: #3c344d; }
-.file-row { padding: 8px 12px; color: #d4c2e6; }
-.app-tile { background: #171925; color: #d2bcdf; border-radius: 3px; padding: 12px; }
-.app-tile:hover { background: #363044; }
-textview, textview text { background: #10121a; color: #c7c2d4; font-family: monospace; font-size: 12px; }
-checkbutton { color: #e0d5eb; padding: 10px; }
-dialog { background: #161923; }
-/* Reference-led LCARS console: black canvas, coral title strips, lavender rails. */
-* { font-family: "DejaVu Sans Condensed", "DejaVu Sans", sans-serif; font-size: 12px; }
-window { background: #000; color: #f6bd54; }
-.masthead { background:#000; border:0; padding:8px 12px; }
-.brand { font-size:30px; color:#ffcb64; letter-spacing:-1px; }
-.masthead-sub { background:#c395c6; color:#000; min-height:22px; padding:4px 12px; font-size:10px; }
-.rail { padding:0 6px 8px 12px; border-right:6px solid #cb737d; border-top-right-radius:36px; }
-.rail-cap { background:#cf747d; color:#000; border-bottom-left-radius:40px; padding:20px 10px; }
-.nav { background:#a299d3; border-radius:0; color:#000; padding:6px 8px; font-size:11px; }
-.nav.selected { background:#ffb938; }
-.nav:nth-child(3) { background:#cd747d; }
-.nav:nth-child(4) { background:#c294c5; }
-button { border-radius:2px; background:#a69bd5; padding:5px 12px; }
-.primary { background:#ffb632; }
-.secondary { background:#a69bd5; }
-.compact { border-radius:0; color:#000; background:#ca727b; }
-.hero { color:#b2a2e3; font-size:34px; letter-spacing:-1px; }
-.system-id { background:#000; border-left:12px solid #cb767e; color:#e8ad44; padding:12px; }
-.page-title { color:#050505; background:#ce7680; border-left:8px solid #b5a3dc; border-radius:14px 0 0 0; font-size:17px; letter-spacing:0; padding:4px 10px; }
-.card { background:#050505; border:1px solid #867dac; border-top:8px solid #c17fb4; border-radius:14px 0 0 0; padding:12px; }
-.metric { color:#ffc24f; font-size:27px; }
-.eyebrow { color:#cf7c82; }
-.muted { color:#ab9bca; }
-progressbar trough { min-width:0; min-height:9px; background:#090909; border:1px solid #c37d88; }
-progressbar progress { min-width:0; min-height:9px; background:#d68b99; padding:0; margin:0; }
-.strip { background:#000; border-left:10px solid #cc7d8c; color:#c5a7de; padding:10px; }
-.footer { background:#000; border-top:12px solid #a69bcc; padding:7px 12px; }
-.status { color:#ffbc3d; }
-.alert-banner { color:#000; background:#ffb93c; padding:10px; font-weight:900; }
-.warning { color:#ff7777; }
-entry, searchentry { background:#000; color:#ffcb65; border:1px solid #a389bc; border-radius:0; }
-.directory { background:#000; }
-.directory row { border-bottom:1px solid #393040; }
-.directory row:selected { background:#a99ccc; color:#000; }
-.file-row { color:#f7bf56; padding:6px 8px; }
-.app-tile { background:#000; color:#eeb447; border-bottom:2px solid #c68192; }
-textview, textview text { background:#000; color:#beaad9; }
+/* Mixed provenance: Codex consolidated CSS foundation; Claude AI continuation
+ * (user-attributed) refined reference colours, elbows, accents and focus styling.
+ * See docs/WORK_PROVENANCE.md. */
+/* LCARS visual system: one palette, native-size type, open-sided instrument rails. */
 
-.dock-button { background:#a49acb; color:#000; padding:3px 12px; border-radius:0; font-size:10px; }
-.dock-button:first-child {background:#ffb938; border-radius:18px 0 0 18px;}
-.footer { border-top:4px solid #c785ad; padding:4px 10px; }
+* { font-family:"Nimbus Sans Narrow", "DejaVu Sans Condensed", sans-serif; font-size:16px; }
+window, dialog, headerbar { background:@lcars_void; color:@lcars_amber; }
+headerbar { border:0; box-shadow:none; }
+button { background:@lcars_lilac; color:@lcars_void; border:0; border-radius:0; min-height:28px; padding:5px 12px; font-weight:700; box-shadow:none; }
+button:hover { background:@lcars_press; }
+button:active { background:@lcars_amber; }
+button:focus-visible, entry:focus, searchentry:focus-within { outline:2px solid @lcars_amber; outline-offset:1px; }
+button:disabled { opacity:0.42; }
+.primary { background:@lcars_amber; }
+.secondary { background:@lcars_lilac; }
+.danger { background:@lcars_coral; }
+.compact { min-height:24px; padding:4px 12px; background:@lcars_coral; font-size:14px; }
 
-/* Small reference-fidelity pass: title-strip segments and instrument frames. */
-.masthead { padding:7px 10px; }
-.header-cap { background:#ffcb64; border-radius:24px 0 0 24px; margin:7px 0; }
-.brand { font-size:29px; margin-right:4px; }
-.masthead-sub { min-height:18px; }
-.page-title { font-size:14px; padding:3px 9px; border-radius:10px 0 0 0; }
-.title-segment-coral { background:#cd747d; }
-.title-segment-lilac { background:#a299d3; }
-.title-segment-amber { background:#ffcb64; border-radius:0 14px 14px 0; }
-.telemetry-panel { border-top:0; border-radius:10px 0 0 0; padding:0 0 10px; }
-.instrument-title { background:#cd747d; color:#000; font-size:11px; font-weight:800; padding:4px 9px; border-radius:9px 0 0 0; }
-.telemetry-panel .metric { margin:0 12px; }
-.telemetry-panel progressbar { margin:0 12px; }
-.console-clock { color:#ffcb64; font-size:16px; font-weight:800; }
-.nav.selected { background:#ffb938; }
+/* Thin identity band retains its original height and rightmost Exit. */
+.masthead { background:@lcars_void; border:0; min-height:32px; padding:2px 8px; }
+.brand { color:@lcars_amber; font-size:26px; font-weight:800; margin-right:4px; }
+.masthead-sub { background:@lcars_rose; color:@lcars_void; min-height:14px; padding:0; margin:6px 0; }
+.header-cap { background:@lcars_amber; border-radius:24px 0 0 24px; margin:5px 0; }
+.header-exit { min-height:24px; padding:0 12px; margin:0; background:@lcars_coral; border-radius:0 14px 14px 0; font-size:14px; }
 
-/* Reference pass 4: compact instruments, readable data tables, live graph. */
-.hero { font-size:30px; }
-.history-panel { border:1px solid #867dac; border-radius:9px 0 0 0; background:#000; }
-.graph-scale { color:#c395c6; font-size:10px; margin:0 8px 6px; }
-.file-headings { background:#a299d3; padding:4px 8px; border-bottom:3px solid #000; }
-.table-heading { color:#000; font-weight:800; font-size:11px; }
-.directory row:selected .file-row, .directory row:selected .muted { color:#000; }
-progressbar trough, progressbar progress { border-radius:0; }
-.directory { border-radius:0; border-left:3px solid #a299d3; }
-
-/* Use the installed condensed face for reference-style headings. */
-.brand, .hero, .page-title, .instrument-title, .metric, .console-clock {
-  font-family:"Nimbus Sans Narrow", "Liberation Sans", sans-serif;
-}
-.brand { font-size:34px; letter-spacing:0; }
-.hero { font-size:36px; }
-.preview-panel { border-bottom:2px solid #c395c6; padding-bottom:10px; }
-
-.workspace-frame { background:#000; border:1px solid #a299d3; }
-.workspace-title { background:#cd747d; border-bottom:3px solid #000; }
-.workspace-title .compact { background:#ffcb64; }
-
-.workspace-frame { background:rgba(0,0,0,0.78); }
-.workspace-frame .metric { font-size:24px; }
-.workspace-frame .telemetry-panel { padding-bottom:6px; }
-
-/* Touch console: open-sided LCARS regions, separate large controls from scaled previews. */
-.console-surface { background:#000; padding:8px; }
-.console-region { background:rgba(0,0,0,0.84); border:0; border-left:7px solid #c395c6; border-top-left-radius:30px; }
-.system-band { background:#cc747d; color:#000; border-radius:24px 0 24px 0; font-family:"Nimbus Sans Narrow",sans-serif; font-size:16px; padding:4px 12px; }
+/* Spatial window chrome: a thin title rail inside a full touch target. */
+.console-surface { background:@lcars_void; padding:3px 5px; }
+.console-region { background:@lcars_void; border:0; border-left:10px solid @lcars_coral; border-top-left-radius:12px; }
+.system-band, .system-band:hover, .system-band:active { background:transparent; border:0; border-radius:0; padding:0; }
+.console-band-title { background:@lcars_coral; color:@lcars_void; min-height:30px; padding:0 10px; border-left:0; border-radius:0; font-size:16px; font-weight:700; }
+.system-band:hover .console-band-title { background:@lcars_press; }
+.window-maximize, .window-minimize, .window-maximize:hover, .window-minimize:hover { background:transparent; border:0; padding:0; min-width:44px; min-height:44px; }
+.window-glyph { color:@lcars_void; min-height:30px; font-size:15px; font-weight:800; }
+.window-maximize .window-glyph { background:@lcars_lilac; }
+.window-minimize .window-glyph { background:@lcars_amber; border-radius:0 15px 15px 0; }
+.window-maximize:hover .window-glyph, .window-minimize:hover .window-glyph { background:@lcars_press; }
 .zoom-target, .zoom-target:hover, .zoom-target:active { background:transparent; border:0; padding:0; box-shadow:none; }
-.resize-handle { background:#ffcb64; color:#000; font-size:24px; border-radius:20px 0 0 0; }
-.arrange-selected { border-left-color:#ffcb64; }
-.arrange-selected .system-band { background:#ffcb64; }
-
+.resize-handle { background:@lcars_amber; font-size:24px; border-radius:20px 0 0 0; }
+.arrange-selected { border-left-color:@lcars_amber; }
+.arrange-selected .console-band-title { background:@lcars_amber; }
+.arrange-mode { background:@lcars_amber; color:@lcars_void; border-radius:0; }
 .console-region scrolledwindow:disabled, .console-region scrolledwindow:disabled * { opacity:1; }
 
-/* Reference pass 7: thin visual bands inside full-height touch targets. */
-.system-band, .system-band:hover, .system-band:active,
-.arrange-selected .system-band { background:transparent; border-radius:0; padding:0; }
-.console-band-title { background:#cd747d; color:#000; min-height:24px; padding:0 9px; border-radius:13px 0 0 0; font-family:"Nimbus Sans Narrow",sans-serif; font-size:15px; font-weight:800; }
-.system-band:hover .console-band-title { background:#dfabb5; }
-.arrange-selected .console-band-title { background:#ffcb64; }
-.band-coral { background:#cd747d; }
-.band-lilac { background:#a299d3; }
-.band-amber { background:#ffcb64; border-radius:0 13px 13px 0; }
-.console-region { border-left:4px solid #c395c6; border-top-left-radius:20px; }
-.header-end-cap { background:#ffcb64; border-radius:0 24px 24px 0; margin:7px 0; }
-.rail-cap { font-family:"Nimbus Sans Narrow",sans-serif; font-size:24px; }
-.console-clock { font-size:20px; }
-.telemetry-panel { border-right:0; border-bottom:1px solid #574b6d; border-left:3px solid #a299d3; border-radius:0; }
-.instrument-title { border-radius:0; }
+/* Segmented bars and open instrument frames use the same colors as home. */
+.page-title { background:@lcars_coral; color:@lcars_void; border-left:8px solid @lcars_lilac; border-radius:12px 0 0 0; font-size:18px; font-weight:700; padding:3px 9px; }
+.title-segment-coral { background:@lcars_coral; }
+.title-segment-lilac { background:@lcars_lilac; }
+.title-segment-amber { background:@lcars_amber; border-radius:0 14px 14px 0; }
+.card { background:@lcars_void; border:0; border-left:12px solid @lcars_lilac; border-top:12px solid @lcars_lilac; border-radius:30px 0 0 0; padding:10px 10px 10px 14px; }
+.instrument-title { background:@lcars_coral; color:@lcars_void; padding:3px 9px; font-size:16px; font-weight:700; }
+.telemetry-panel { border-right:0; border-bottom:0; border-left:10px solid @lcars_lilac; border-top:10px solid @lcars_lilac; border-top-left-radius:26px; padding:0 0 8px 6px; }
+.telemetry-panel .metric, .telemetry-panel progressbar { margin:0 12px; }
+.history-panel { background:@lcars_void; border:0; border-left:10px solid @lcars_coral; border-top:10px solid @lcars_coral; border-radius:26px 0 0 0; }
+.metric { color:@lcars_amber; font-size:30px; font-weight:800; }
+.hero { color:@lcars_lilac; font-size:36px; font-weight:800; }
+.eyebrow { color:@lcars_coral; font-size:16px; font-weight:700; }
+.muted { color:@lcars_muted; font-size:14px; }
+.graph-scale { color:@lcars_rose; font-size:13px; margin:0 8px 6px; }
+.strip { background:@lcars_void; border-left:8px solid @lcars_coral; color:@lcars_muted; padding:8px 10px; font-size:15px; }
+.preview-panel { border-bottom:2px solid @lcars_rose; padding-bottom:10px; }
+progressbar trough { min-width:0; min-height:9px; background:@lcars_void; border:1px solid @lcars_coral; border-radius:0; }
+progressbar progress { min-width:0; min-height:9px; background:@lcars_coral; border:0; border-radius:0; padding:0; margin:0; }
 
-/* Bottom taskbar and LCARS Start menu replace the command rail. */
-.footer { border-top:4px solid #c395c6; padding:5px 8px; }
-.start-button > button { background:#ffcb64; color:#000; border-radius:26px 0 0 26px; padding:6px 15px; font-family:"Nimbus Sans Narrow",sans-serif; font-weight:800; font-size:17px; }
-.lcars-start-menu > contents { background:#000; color:#ffcb64; border:2px solid #a299d3; border-left:12px solid #cd747d; border-radius:26px 0 0 0; padding:12px; }
-.start-app { background:#000; color:#ffcb64; border-bottom:1px solid #67445b; border-radius:0; padding:6px 10px; }
-.start-app:hover { background:#c395c6; color:#000; }
-.start-system { background:#a299d3; border-radius:0; font-family:"Nimbus Sans Narrow",sans-serif; font-size:17px; }
-.start-system:nth-child(3), .start-system:nth-child(6) { background:#cd747d; }
+/* Data stays readable at native pixels; selected rows use inverse LCARS colors. */
+entry, searchentry { background:@lcars_void; color:@lcars_amber; border:1px solid @lcars_lilac; border-radius:0; min-height:30px; padding:6px 9px; }
+.directory { background:@lcars_void; border-left:3px solid @lcars_lilac; border-radius:0; }
+.directory row { border-bottom:1px solid @lcars_rule; }
+.directory row:selected { background:@lcars_lilac; color:@lcars_void; }
+.directory row:selected .file-row, .directory row:selected .muted { color:@lcars_void; }
+.file-row { color:@lcars_amber; padding:6px 8px; font-size:16px; }
+.file-headings { background:@lcars_lilac; padding:3px 8px; border-bottom:3px solid @lcars_void; }
+.table-heading { color:@lcars_void; font-size:16px; font-weight:700; }
+.app-tile { background:@lcars_void; color:@lcars_amber; border-bottom:2px solid @lcars_coral; border-left:7px solid @lcars_coral; padding:10px 10px 10px 14px; }
+.app-tile:hover { background:@lcars_lilac; color:@lcars_void; }
+textview, textview text { background:@lcars_void; color:@lcars_muted; font-family:monospace; font-size:13px; }
+checkbutton { color:@lcars_muted; padding:8px; }
+checkbutton check { background:@lcars_void; color:@lcars_void; border:2px solid @lcars_lilac; border-radius:0; min-width:22px; min-height:22px; }
+checkbutton check:checked { background:@lcars_amber; border-color:@lcars_amber; }
+scrollbar slider { background:@lcars_lilac; border-radius:0; min-width:6px; min-height:24px; }
+scrollbar trough { background:@lcars_void; }
 
-/* Single-touch window controls: independent targets, no nested buttons. */
-.window-maximize, .window-minimize { color:#000; padding:0; min-width:44px; min-height:44px; font-size:24px; font-weight:800; border-radius:0; }
-.window-maximize { background:#a299d3; }
-.window-minimize { background:#ffcb64; border-radius:0 20px 20px 0; }
-.window-maximize:hover, .window-minimize:hover { background:#f4d8bb; }
-.arrange-mode { background:#ffcb64; color:#000; border-radius:0; }
-.console-band-title { font-size:14px; padding:0 5px; }
-
-.window-maximize, .window-minimize, .window-maximize:hover, .window-minimize:hover { background:transparent; border-radius:0; }
-.window-glyph { color:#000; font-size:24px; min-height:24px; font-weight:800; }
-.window-maximize .window-glyph { background:#a299d3; }
-.window-minimize .window-glyph { background:#ffcb64; border-radius:0 13px 13px 0; }
-.window-maximize:hover .window-glyph, .window-minimize:hover .window-glyph { background:#f4d8bb; }
-
-.arrange-mode popover contents { background:#000; color:#ffcb64; border:2px solid #a299d3; border-radius:0 0 16px 0; }
-.arrange-mode popover row { min-height:44px; color:#ffcb64; background:#000; }
-.arrange-mode popover row:selected { background:#a299d3; color:#000; }
-
-/* Compact identity strip; arrangement controls appear only while editing. */
-.masthead { padding:2px 8px; min-height:32px; }
-.brand { font-size:26px; }
-.masthead-sub { min-height:14px; padding:0; margin:6px 0; }
-.header-cap, .header-end-cap { margin:5px 0; }
-.console-surface { padding:3px 5px; }
-.console-region { background:#000; }
-
-.header-exit { background:#cd747d; color:#000; min-height:24px; padding:0 12px; margin:0; border-radius:0 14px 14px 0; }
-
-/* Reference pass 12: open instrument rails and compact segmented controls. */
-.console-region { border-left-color:#c47ea7; }
-.console-band-title { border-left:6px solid #ffcb64; border-radius:14px 0 0 0; padding-left:7px; }
-.window-minimize .window-glyph { background:#cd747d; }
-.card { border-right:0; border-bottom:0; border-left:3px solid #a299d3; border-top:5px solid #c47ea7; border-radius:16px 0 0 0; }
-.history-panel { border-right:0; border-left:3px solid #a299d3; border-top:3px solid #cd747d; border-bottom:0; border-radius:12px 0 0 0; }
-.eyebrow, .table-heading, .dock-button, .file-row, .start-app { font-family:"Nimbus Sans Narrow",sans-serif; }
-.eyebrow, .table-heading { font-size:14px; }
-.dock-button { font-size:14px; border-top:3px solid #c47ea7; }
-.dock-button:nth-child(3) { background:#cd747d; }
-.dock-button:nth-child(4) { background:#c395c6; }
-scrollbar slider { background:#a299d3; border-radius:0; min-width:6px; min-height:24px; }
-scrollbar trough { background:#000; }
+/* Bottom access rail and matching popovers. */
+.footer { background:@lcars_void; border-top:4px solid @lcars_rose; padding:5px 8px; }
+.console-clock { color:@lcars_amber; font-size:20px; font-weight:800; }
+.status { color:@lcars_amber; font-size:14px; font-weight:700; }
+.warning { color:@lcars_alert; }
+.alert-banner { background:@lcars_amber; color:@lcars_void; padding:8px 12px; font-weight:800; }
+.dock-button { background:@lcars_lilac; color:@lcars_void; border-top:3px solid @lcars_rose; padding:3px 12px; font-size:16px; }
+.dock-button:first-child { background:@lcars_amber; border-radius:18px 0 0 18px; }
+.dock-button:nth-child(3) { background:@lcars_coral; }
+.dock-button:nth-child(4) { background:@lcars_rose; }
+.start-button > button { background:@lcars_amber; color:@lcars_void; border-radius:26px 0 0 26px; padding:6px 15px; font-size:18px; font-weight:700; }
+popover > contents { background:@lcars_void; color:@lcars_amber; border:2px solid @lcars_lilac; border-radius:12px 0 12px 0; padding:8px; }
+.lcars-start-menu > contents { border-left:12px solid @lcars_coral; border-radius:26px 0 0 0; padding:12px; }
+.start-app { background:@lcars_void; color:@lcars_amber; border-bottom:1px solid @lcars_rule; padding:6px 10px; font-size:16px; }
+.start-app:hover { background:@lcars_lilac; color:@lcars_void; }
+.start-system { background:@lcars_lilac; font-size:18px; }
+.start-system:nth-child(3), .start-system:nth-child(6) { background:@lcars_coral; }
+.arrange-mode popover row { min-height:44px; color:@lcars_amber; background:@lcars_void; }
+.arrange-mode popover row:selected { background:@lcars_lilac; color:@lcars_void; }

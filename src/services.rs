@@ -1,3 +1,5 @@
+// Mixed provenance: Codex service baseline; Claude AI continuation (user-attributed)
+// added structured network/storage/process parsers. See docs/WORK_PROVENANCE.md.
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -263,6 +265,105 @@ mod tests {
     }
 }
 
+/// A network interface as NetworkManager reports it in terse mode.
+#[derive(Debug, Clone, PartialEq)]
+pub struct NetDevice {
+    pub device: String,
+    pub kind: String,
+    pub state: String,
+    pub connection: String,
+}
+/// Parse `nmcli -t -f DEVICE,TYPE,STATE,CONNECTION device status`. The connection
+/// name is taken whole, so colons inside it do not split the row.
+pub fn parse_devices(raw: &str) -> Vec<NetDevice> {
+    raw.lines()
+        .filter_map(|line| {
+            let mut f = line.splitn(4, ':');
+            let device = f.next()?.trim().to_string();
+            let kind = f.next()?.trim().to_string();
+            let state = f.next()?.trim().to_string();
+            let connection = f.next().unwrap_or("").trim().to_string();
+            if device.is_empty() {
+                return None;
+            }
+            Some(NetDevice {
+                device,
+                kind,
+                state,
+                connection,
+            })
+        })
+        .collect()
+}
+/// Parse `ip -brief address` into interface, link state and the addresses on it.
+pub fn parse_addresses(raw: &str) -> Vec<(String, String, String)> {
+    raw.lines()
+        .filter_map(|line| {
+            let f: Vec<&str> = line.split_whitespace().collect();
+            if f.len() < 2 {
+                return None;
+            }
+            Some((f[0].to_string(), f[1].to_string(), f[2..].join("  ")))
+        })
+        .collect()
+}
+/// One mounted filesystem, parsed from `df -hT` into fields the console can lay out.
+#[derive(Debug, Clone, PartialEq)]
+pub struct StorageRow {
+    pub filesystem: String,
+    pub fstype: String,
+    pub size: String,
+    pub used: String,
+    pub avail: String,
+    pub use_pct: u8,
+    pub mount: String,
+}
+/// Parse `df -hT`. Unreadable lines are skipped rather than surfaced as noise.
+pub fn parse_storage(raw: &str) -> Vec<StorageRow> {
+    raw.lines()
+        .skip(1)
+        .filter_map(|line| {
+            let f: Vec<&str> = line.split_whitespace().collect();
+            if f.len() < 7 {
+                return None;
+            }
+            Some(StorageRow {
+                filesystem: f[0].to_string(),
+                fstype: f[1].to_string(),
+                size: f[2].to_string(),
+                used: f[3].to_string(),
+                avail: f[4].to_string(),
+                use_pct: f[5].trim_end_matches('%').parse().unwrap_or(0),
+                mount: f[6..].join(" "),
+            })
+        })
+        .collect()
+}
+/// One process, parsed from `ps -eo pid,comm,pcpu,pmem`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ProcessRow {
+    pub pid: u32,
+    pub command: String,
+    pub cpu: f32,
+    pub mem: f32,
+}
+pub fn parse_processes(raw: &str) -> Vec<ProcessRow> {
+    raw.lines()
+        .skip(1)
+        .filter_map(|line| {
+            let f: Vec<&str> = line.split_whitespace().collect();
+            if f.len() < 4 {
+                return None;
+            }
+            Some(ProcessRow {
+                pid: f[0].parse().ok()?,
+                command: f[1].to_string(),
+                cpu: f[2].parse().unwrap_or(0.0),
+                mem: f[3].parse().unwrap_or(0.0),
+            })
+        })
+        .collect()
+}
 pub fn drive_labels(ids: &[String]) -> Result<Vec<String>, String> {
     let path = config_path().with_file_name("drive-labels.json");
     let mut map: std::collections::BTreeMap<String, String> = match fs::read(&path) {
@@ -302,6 +403,42 @@ fn assign_drive_labels(
 #[cfg(test)]
 mod drive_tests {
     use super::*;
+    #[test]
+    fn device_parsing_keeps_connection_names_with_colons() {
+        let raw = "enp0s1:ethernet:connected:Wired connection 1\n\nlo:loopback:connected (externally):lo\n";
+        let rows = parse_devices(raw);
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].device, "enp0s1");
+        assert_eq!(rows[0].connection, "Wired connection 1");
+        assert_eq!(rows[1].state, "connected (externally)");
+    }
+    #[test]
+    fn address_parsing_groups_every_address_on_the_link() {
+        let raw = "enp0s1  UP  192.168.64.3/24 fe80::1/64\nlo  UNKNOWN  127.0.0.1/8\n";
+        let rows = parse_addresses(raw);
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].1, "UP");
+        assert!(rows[0].2.contains("192.168.64.3/24"));
+    }
+    #[test]
+    fn storage_parsing_keeps_real_rows_and_drops_noise() {
+        let raw = "Filesystem     Type   Size  Used Avail Use% Mounted on\n                   /dev/vda3      btrfs   63G   19G   44G  30% /\n                   truncated line\n                   share          9p     229G  204G   26G  89% /mnt/macos\n";
+        let rows = parse_storage(raw);
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].mount, "/");
+        assert_eq!(rows[0].use_pct, 30);
+        assert_eq!(rows[1].fstype, "9p");
+        assert_eq!(rows[1].use_pct, 89);
+    }
+    #[test]
+    fn process_parsing_reads_pid_cpu_and_memory() {
+        let raw = "    PID COMMAND         %CPU %MEM\n                   \u{20}  1 systemd          0.1  0.4\n                   bad\n                   \u{20}842 gnome-shell     12.5  6.3\n";
+        let rows = parse_processes(raw);
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].pid, 1);
+        assert_eq!(rows[1].command, "gnome-shell");
+        assert!((rows[1].cpu - 12.5).abs() < f32::EPSILON);
+    }
     #[test]
     fn drive_labels_survive_reordering_and_unplugging() {
         let mut map = std::collections::BTreeMap::new();

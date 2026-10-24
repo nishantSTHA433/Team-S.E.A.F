@@ -1,3 +1,6 @@
+// Mixed provenance: Codex spatial/motion baseline; Claude AI continuation (user-attributed):
+// rail/viewport/emblem refinements, Arrange Cancel and accessible controls.
+// See docs/WORK_PROVENANCE.md.
 use super::{button, column, draw_emblem, label, row, Navigate, SetMode, PANELS};
 use crate::services::{self, Preferences};
 use gtk::{glib, prelude::*};
@@ -136,7 +139,24 @@ fn drop_target(
             .then_some(i)
     })
 }
-fn logo_region(regions: &[Region]) -> Region {
+const EMPTY_REGION: Region = Region {
+    x: 0.5,
+    y: 0.5,
+    w: 0.0,
+    h: 0.0,
+};
+fn region_score(r: Region) -> f64 {
+    r.w * r.h / (1.0 + ((r.x + r.w / 2.0 - 0.5).powi(2) + (r.y + r.h / 2.0 - 0.5).powi(2)) * 2.0)
+}
+fn region_clear(r: Region, regions: &[Region]) -> bool {
+    !regions.iter().any(|o| {
+        r.x < o.x + o.w - 0.00001
+            && r.x + r.w > o.x + 0.00001
+            && r.y < o.y + o.h - 0.00001
+            && r.y + r.h > o.y + 0.00001
+    })
+}
+fn logo_region(regions: &[Region], current: Region) -> Region {
     let mut xs = vec![0.0, 1.0];
     let mut ys = vec![0.0, 1.0];
     for r in regions {
@@ -177,6 +197,15 @@ fn logo_region(regions: &[Region]) -> Region {
                 }
             }
         }
+    }
+    // Hysteresis: the identity keeps the gap it already occupies unless a rival is
+    // clearly better, so near-equal gaps cannot make it jump on routine telemetry.
+    if current.w > 0.0
+        && current.h > 0.0
+        && region_clear(current, regions)
+        && score < region_score(current) * 1.15
+    {
+        return current;
     }
     best
 }
@@ -239,6 +268,8 @@ fn motion_progress(elapsed: f64, reduced: bool) -> f64 {
         (elapsed / 0.30).clamp(0.0, 1.0)
     }
 }
+/// Regions, hidden flags and the automatic-layout setting captured on entering Arrange.
+type ArrangeSnapshot = (Vec<Region>, Vec<bool>, bool);
 struct Surface {
     demand: super::TaskDemand,
     attention: Cell<Option<lcars_desktop::workspace::PanelId>>,
@@ -263,6 +294,8 @@ struct Surface {
     restored_input: Cell<Option<usize>>,
     selected: Cell<usize>,
     arranging: Cell<bool>,
+    /// Layout as it stood when Arrange opened, so Cancel can discard edits.
+    arrange_snapshot: RefCell<Option<ArrangeSnapshot>>,
     active: Cell<bool>,
     dimensions: Cell<(i32, i32)>,
     status: gtk::Label,
@@ -276,8 +309,10 @@ struct Surface {
     paused_at: Cell<Option<std::time::Instant>>,
     preferences: Rc<RefCell<Preferences>>,
     emblem_shown: Cell<Region>,
+    emblem_chosen: Cell<Region>,
     emblem_opacity: Cell<f64>,
     mode_picker: gtk::DropDown,
+    cancel_arrange: gtk::Button,
     edits: gtk::Box,
     arrange_button: gtk::Button,
     command: gtk::Box,
@@ -385,7 +420,14 @@ impl Surface {
                 *self.regions.borrow_mut() = regions;
                 *self.solution.borrow_mut() = solution;
             }
+            *self.arrange_snapshot.borrow_mut() = Some((
+                self.regions.borrow().clone(),
+                self.hidden.borrow().clone(),
+                self.auto_layout.get(),
+            ));
             self.auto_layout.set(false);
+        } else {
+            self.arrange_snapshot.borrow_mut().take();
         }
         self.focused.set(None);
         self.advanced.set(false);
@@ -400,6 +442,24 @@ impl Surface {
         if !on {
             self.persist();
         }
+        self.animate();
+    }
+    /// 13c: discard every edit made since Arrange opened and leave without saving.
+    fn cancel_arrange(&self) {
+        self.suspend_input();
+        self.restored_input.set(None);
+        if let Some((regions, hidden, auto)) = self.arrange_snapshot.borrow_mut().take() {
+            *self.regions.borrow_mut() = regions;
+            *self.hidden.borrow_mut() = hidden;
+            self.auto_layout.set(auto);
+        }
+        self.arranging.set(false);
+        self.focused.set(None);
+        self.advanced.set(false);
+        self.mode_picker.set_selected(0);
+        self.swap_source.set(None);
+        self.sync_controls();
+        self.status.set_text("ARRANGEMENT DISCARDED / HOME");
         self.animate();
     }
     fn home(&self) {
@@ -418,12 +478,13 @@ impl Surface {
         let arranging = self.arranging.get();
         self.command.set_visible(arranging);
         self.mode_picker.set_visible(arranging);
+        self.cancel_arrange.set_visible(arranging);
         self.edits.set_visible(arranging && self.advanced.get());
         self.arrange_button
             .set_label(if arranging { "DONE" } else { "ARRANGE" });
     }
     fn emblem_target(&self) -> Region {
-        logo_region(
+        let chosen = logo_region(
             &self
                 .regions
                 .borrow()
@@ -432,7 +493,10 @@ impl Surface {
                 .filter(|(i, _)| !self.hidden.borrow()[*i])
                 .map(|(_, r)| *r)
                 .collect::<Vec<_>>(),
-        )
+            self.emblem_chosen.get(),
+        );
+        self.emblem_chosen.set(chosen);
+        chosen
     }
     fn animate(&self) {
         self.paused_at.set(None);
@@ -543,6 +607,13 @@ impl Surface {
             } else {
                 dimensions
             };
+        // Step 03e overflow fallback: the solver may pack a canvas larger than the
+        // viewport when readable minima cannot all be met. Requesting that size hides
+        // whole panels under the taskbar, so clamp and let the tiles shrink instead.
+        let canvas_size = (
+            canvas_size.0.min(dimensions.0),
+            canvas_size.1.min(dimensions.1),
+        );
         let width = canvas_size.0.max(1) as f64;
         let height = canvas_size.1.max(1) as f64;
         self.shell
@@ -600,13 +671,16 @@ impl Surface {
             };
             self.pages[i].set_visible(focus == Some(i));
             self.overviews[i].widget.set_visible(focus != Some(i));
-            self.overviews[i].widget.set_size_request(w, content_h);
+            let inner_w = (w - crate::theme::RAIL).max(1);
+            self.overviews[i]
+                .widget
+                .set_size_request(inner_w, content_h);
             self.pages[i].set_size_request(raw_w, raw_h);
             let interactive = focus == Some(i) && progress >= 1.0;
             self.pages[i].set_can_target(interactive);
             self.pages[i].set_sensitive(interactive);
             self.pages[i].set_focusable(interactive);
-            let scale = (w as f32 / raw_w as f32).min(content_h as f32 / raw_h as f32);
+            let scale = (inner_w as f32 / raw_w as f32).min(content_h as f32 / raw_h as f32);
             self.interiors[i].set_child_transform(
                 &self.pages[i],
                 Some(&gtk::gsk::Transform::new().scale(scale, scale)),
@@ -702,8 +776,10 @@ pub(super) fn build(
     let overview = button("ALL SYSTEMS", "primary");
     let arrange = button("ARRANGE", "secondary");
     let auto = button("AUTO FIT", "secondary");
+    let cancel_arrange = button("CANCEL", "danger");
     command.append(&overview);
     command.append(&arrange);
+    command.append(&cancel_arrange);
     command.append(&auto);
     let mode_picker = gtk::DropDown::from_strings(&["BASIC", "ADVANCED"]);
     mode_picker.set_height_request(48);
@@ -758,6 +834,7 @@ pub(super) fn build(
         let tile = gtk::Overlay::new();
         tile.set_widget_name(&format!("lcars-panel-{route}"));
         tile.add_css_class("console-region");
+        tile.add_css_class(&format!("accent-{}", tiles.len() + 1));
         tile.set_overflow(gtk::Overflow::Hidden);
         let bounds = gtk::DrawingArea::new();
         tile.set_child(Some(&bounds));
@@ -766,7 +843,7 @@ pub(super) fn build(
         heading.set_hexpand(true);
         heading.set_height_request(48);
         let title_text = label(title, "console-band-title");
-        title_text.set_valign(gtk::Align::Center);
+        title_text.set_valign(gtk::Align::Start);
         title_text.set_wrap(false);
         title_text.set_ellipsize(gtk::pango::EllipsizeMode::End);
         heading.set_child(Some(&title_text));
@@ -789,11 +866,12 @@ pub(super) fn build(
             let control = button(icon, class);
             control.set_size_request(44, 48);
             let glyph = label(icon, "window-glyph");
-            glyph.set_valign(gtk::Align::Center);
+            glyph.set_valign(gtk::Align::Start);
             glyph.set_justify(gtk::Justification::Center);
             glyph.set_xalign(0.5);
             control.set_child(Some(&glyph));
             control.set_tooltip_text(Some(tip));
+            control.update_property(&[gtk::accessible::Property::Label(tip)]);
             band.append(&control);
             collection.push(control);
         }
@@ -860,6 +938,7 @@ pub(super) fn build(
         restored_input: Cell::new(None),
         selected: Cell::new(0),
         arranging: Cell::new(false),
+        arrange_snapshot: RefCell::new(None),
         active: Cell::new(false),
         dimensions: Cell::new((0, 0)),
         status,
@@ -871,9 +950,11 @@ pub(super) fn build(
         transition: RefCell::new(None),
         paused_at: Cell::new(None),
         preferences: prefs.clone(),
-        emblem_shown: Cell::new(logo_region(&[])),
+        emblem_shown: Cell::new(logo_region(&[], EMPTY_REGION)),
+        emblem_chosen: Cell::new(EMPTY_REGION),
         emblem_opacity: Cell::new(1.0),
         mode_picker: mode_picker.clone(),
+        cancel_arrange: cancel_arrange.clone(),
         edits: edits.clone(),
         arrange_button: arrange.clone(),
         command: command.clone(),
@@ -951,7 +1032,7 @@ pub(super) fn build(
         draw_emblem(area, cr, 160, 160);
         let _ = cr.restore();
         cr.select_font_face(
-            "Nimbus Sans Narrow",
+            crate::theme::FONT,
             gtk::cairo::FontSlant::Normal,
             gtk::cairo::FontWeight::Bold,
         );
@@ -960,19 +1041,26 @@ pub(super) fn build(
                 "SYSTEM AVAILABLE",
                 if horizontal { 80.0 } else { 188.0 },
                 if horizontal { 34.0 } else { 27.0 },
-                (0.70, 0.64, 0.89),
+                crate::theme::rgb(crate::theme::LILAC),
             ),
             (
                 "STATION ID 1440–900",
                 if horizontal { 107.0 } else { 211.0 },
                 if horizontal { 22.0 } else { 17.0 },
-                (0.80, 0.45, 0.49),
+                crate::theme::rgb(crate::theme::CORAL),
             ),
         ] {
-            cr.set_font_size(font_size);
             cr.set_source_rgb(color.0, color.1, color.2);
+            cr.set_font_size(font_size);
+            let center: f64 = if horizontal { 325.0 } else { 105.0 };
+            // Identity shrinks to its reserved width instead of overrunning a neighbouring panel.
+            let limit = 2.0 * center.min(design_w - center) - 8.0;
             if let Ok(extent) = cr.text_extents(text) {
-                let center = if horizontal { 325.0 } else { 105.0 };
+                if extent.width() > limit && extent.width() > 0.0 {
+                    cr.set_font_size(font_size * limit / extent.width());
+                }
+            }
+            if let Ok(extent) = cr.text_extents(text) {
                 cr.move_to(center - extent.width() / 2.0 - extent.x_bearing(), baseline);
                 let _ = cr.show_text(text);
             }
@@ -1176,6 +1264,12 @@ pub(super) fn build(
         }
     });
     let weak = Rc::downgrade(&surface);
+    cancel_arrange.connect_clicked(move |_| {
+        if let Some(s) = weak.upgrade() {
+            s.cancel_arrange();
+        }
+    });
+    let weak = Rc::downgrade(&surface);
     auto.connect_clicked(move |_| {
         if let Some(s) = weak.upgrade() {
             s.reflow();
@@ -1375,7 +1469,7 @@ mod tests {
             let ids = (0..count).collect::<Vec<_>>();
             let slots = automatic(&ids);
             let panels = ids.iter().map(|&i| slots[i]).collect::<Vec<_>>();
-            let logo = logo_region(&panels);
+            let logo = logo_region(&panels, EMPTY_REGION);
             let coverage = panels.iter().map(|r| r.w * r.h).sum::<f64>() + logo.w * logo.h;
             assert!(coverage > 0.95, "count {count}: {coverage}");
             assert!(logo.w * logo.h > 0.09);
