@@ -2,7 +2,7 @@
 
 ## Start here
 
-The authoritative project is `/home/fedora/RustroverProjects/lcars-desktop` inside Fedora. Open that folder in RustRover. `src/` contains Rust logic, `assets/lcars.css` contains visual styling, `Cargo.toml` defines the Rust package/dependencies, and `WORK_TRACKER.md` is the execution record. `docs/WORK_PROVENANCE.md` records the Codex/Claude boundary.
+The authoritative project is `/home/fedora/RustroverProjects/lcars-desktop` inside Fedora. Open that folder in RustRover. `src/` contains Rust logic, `assets/lcars.gtkcss` contains visual styling, `Cargo.toml` defines the Rust package/dependencies, and `WORK_TRACKER.md` is the execution record. `docs/WORK_PROVENANCE.md` records the Codex/Claude boundary.
 
 This is one native Rust program using GTK4 for windows, controls, events and media widgets, with Cairo drawing for custom LCARS instruments. It is not a web page or a replacement Fedora operating system. The six built-in systems are panels within that one process. Other Fedora programs launched from Applications are separate processes with their own windows.
 
@@ -29,7 +29,7 @@ All paths below are relative to the Fedora project root.
 | `src/attention.rs` | `Demand`, task priorities and `Contacts`: temporary space emphasis and tracking active input |
 | `src/overview.rs` | Cairo home-summary drawing: `draw_system`, `draw_network`, `draw_table`, `draw_tools`; readable summaries rather than screenshots of shrunken pages |
 | `src/theme.rs` | Shared colours, `FONT` (currently Oswald), `RAIL` (10), per-panel `ACCENTS`, generated `stylesheet()` |
-| `assets/lcars.css` | GTK visual rules: rails, elbows, typography, controls, lists, menus, dialogs and interaction states |
+| `assets/lcars.gtkcss` | GTK visual rules: rails, elbows, typography, controls, lists, menus, dialogs and interaction states |
 | `src/network.rs` | `subscribe` for NetworkManager events, `classify` for user-facing state, `speed_test` for bounded measurements |
 | `src/services.rs` | `monitor`, `Snapshot`, `Preferences`, `command`, `diagnostics`, structured network/storage/process parsers and drive aliases |
 | `src/tools.rs` | `page` for calculator/system scans, `render_findings` for structured diagnostic results, `speed_panel` for start/cancel/progress/result controls |

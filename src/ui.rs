@@ -978,6 +978,19 @@ struct FileItem {
     size: u64,
 }
 
+/// Detach focus before destroying a focused subtree. GTK 4.10's label focus
+/// traversal can otherwise retain a pointer to a row that was just removed.
+pub(crate) fn clear_focus_within(widget: &impl IsA<gtk::Widget>) {
+    let widget = widget.as_ref();
+    if let Some(root) = widget.root() {
+        if let Some(focus) = gtk::prelude::RootExt::focus(&root) {
+            if focus == *widget || focus.is_ancestor(widget) {
+                gtk::prelude::RootExt::set_focus(&root, None::<&gtk::Widget>);
+            }
+        }
+    }
+}
+
 fn load_directory(
     path: PathBuf,
     list: gtk::ListBox,
@@ -987,6 +1000,7 @@ fn load_directory(
 ) {
     let request = generation.get().wrapping_add(1);
     generation.set(request);
+    clear_focus_within(&list);
     while let Some(child) = list.first_child() {
         list.remove(&child);
     }
@@ -1135,6 +1149,7 @@ fn render_network_findings(
     routes: &str,
     dns: &str,
 ) {
+    clear_focus_within(into);
     while let Some(c) = into.first_child() {
         into.remove(&c);
     }
@@ -1535,6 +1550,7 @@ fn files_page(
         let navigate = navigate.clone();
         let status = status.clone();
         Rc::new(move |monitor| {
+            clear_focus_within(&mounted);
             while let Some(c) = mounted.first_child() {
                 mounted.remove(&c);
             }
@@ -1706,6 +1722,7 @@ fn files_page(
 #[cfg(test)]
 mod gtk_adapter_tests {
     use super::*;
+    #[track_caller]
     fn until(mut ready: impl FnMut() -> bool) {
         let context = glib::MainContext::default();
         let start = std::time::Instant::now();
@@ -1719,6 +1736,33 @@ mod gtk_adapter_tests {
             );
             std::thread::sleep(Duration::from_millis(10));
         }
+    }
+    // A delayed initial configure can overwrite a resize request in GTK/VMs.
+    // Retry the request while waiting for actual allocation; never relax the target.
+    #[track_caller]
+    fn resize_to(window: &impl IsA<gtk::Window>, width: i32, height: i32) {
+        let window = window.as_ref();
+        let mut next_request = std::time::Instant::now();
+        let started = next_request;
+        until(|| {
+            if window.width() == width && window.height() == height {
+                return true;
+            }
+            if std::time::Instant::now() >= next_request {
+                if started.elapsed().as_secs() >= 6 {
+                    eprintln!(
+                        "Resize target {width}x{height}, actual {}x{}, minimum {:?} {:?}",
+                        window.width(),
+                        window.height(),
+                        window.measure(gtk::Orientation::Horizontal, -1),
+                        window.measure(gtk::Orientation::Vertical, width)
+                    );
+                }
+                window.set_default_size(width, height);
+                next_request = std::time::Instant::now() + Duration::from_millis(200);
+            }
+            false
+        });
     }
     #[test]
     #[ignore = "requires active Fedora display and LCARS_MEDIA_FIXTURE; run explicitly"]
@@ -1763,11 +1807,13 @@ mod gtk_adapter_tests {
         window.present();
         until(|| window.width() >= 750);
         assert_eq!(inputs.orientation(), gtk::Orientation::Horizontal);
-        window.set_default_size(400, 400);
+        // Let the initial map/configure finish before requesting another size.
+        settle();
+        resize_to(&window, 400, 400);
         until(|| inputs.orientation() == gtk::Orientation::Vertical);
         assert_eq!(first.text(), "selected value");
         assert_eq!(second.text(), "persistent query");
-        window.set_default_size(800, 400);
+        resize_to(&window, 800, 400);
         until(|| inputs.orientation() == gtk::Orientation::Horizontal);
         assert_eq!(second.text(), "persistent query");
         let fixture =
@@ -1812,8 +1858,9 @@ mod gtk_adapter_tests {
         let full = validation_app
             .windows()
             .into_iter()
-            .find(|w| w.is_visible())
+            .find(|w| w.title().as_deref() == Some("LCARS • Fedora Operations"))
             .expect("full interface window");
+        settle();
         fn find_pages(widget: &gtk::Widget) -> Option<gtk::Stack> {
             if let Some(stack) = widget.downcast_ref::<gtk::Stack>() {
                 if stack.child_by_name("dashboard").is_some() {
@@ -1834,8 +1881,13 @@ mod gtk_adapter_tests {
             pages.set_visible_child_name(route);
             let page = pages.child_by_name(route).unwrap();
             for (width, height) in [(1000, 720), (640, 540), (800, 440), (640, 740), (1000, 720)] {
-                full.set_default_size(width, height);
-                until(|| page.is_mapped() && page.width() > 0);
+                resize_to(&full, width, height);
+                until(|| {
+                    page.is_mapped()
+                        && page.width() > 0
+                        && full.width() == width
+                        && full.height() == height
+                });
                 let start = std::time::Instant::now();
                 while start.elapsed() < Duration::from_millis(180) {
                     while glib::MainContext::default().pending() {
@@ -1882,6 +1934,56 @@ mod gtk_adapter_tests {
             out.extend(descendants(&w));
         }
         out
+    }
+    #[test]
+    #[ignore = "requires a GTK display; run via scripts/verify.sh"]
+    fn gtk_focused_file_navigation_and_panel_lifecycle() {
+        gtk::init().expect("GTK display required");
+        let app = gtk::Application::builder()
+            .application_id("org.lcars.FocusCheck")
+            .build();
+        app.register(None::<&gio::Cancellable>).unwrap();
+        let config = std::env::temp_dir().join(format!("lcars-focus-check-{}", std::process::id()));
+        std::fs::create_dir_all(&config).unwrap();
+        std::env::set_var("XDG_CONFIG_HOME", &config);
+        let directory = config.join("folders");
+        std::fs::create_dir_all(directory.join("child")).unwrap();
+        std::fs::write(
+            directory.join("sample.txt"),
+            "temporary LCARS focus regression fixture",
+        )
+        .unwrap();
+        let window = gtk::ApplicationWindow::builder()
+            .application(&app)
+            .default_width(1000)
+            .default_height(720)
+            .build();
+        let data = Rc::new(RefCell::new(console::InstrumentData::default()));
+        let files = files_page(&window, &data);
+        window.set_child(Some(&files));
+        window.present();
+        settle();
+        let path = data.borrow().sources.files_path.clone().unwrap();
+        let list = data.borrow().sources.files_list.clone().unwrap();
+        for _ in 0..12 {
+            path.set_text(&directory.to_string_lossy());
+            path.emit_activate();
+            until(|| list.row_at_index(1).is_some());
+            let row = list.row_at_index(0).unwrap();
+            assert!(row.grab_focus());
+            list.select_row(Some(&row));
+            list.emit_by_name::<()>("row-activated", &[&row]);
+            drop(row);
+            until(|| list.is_sensitive() && list.first_child().is_none());
+            assert_eq!(
+                path.text().as_str(),
+                directory.join("child").to_str().unwrap()
+            );
+        }
+        window.close();
+        settle();
+        workflow_continuity(&app, &config);
+        println!("FOCUS_LIFECYCLE_VERIFIED");
     }
     fn workflow_continuity(app: &gtk::Application, config: &std::path::Path) {
         let fixture = config.join("directory-fixture");

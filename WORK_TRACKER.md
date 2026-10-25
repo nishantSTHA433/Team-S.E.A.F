@@ -3,7 +3,7 @@
 Maintainers: Codex and Claude AI (continuation attributed per user instruction; see docs/WORK_PROVENANCE.md). User-visible, assistant-maintained; the user does not need to update this file. Explicit user corrections always take precedence. This file is the authoritative execution tracker; historical docs are supporting context.
 
 Authoritative location: /home/fedora/RustroverProjects/lcars-desktop/WORK_TRACKER.md
-Updated: 2026-10-22
+Updated: 2026-10-24
 
 ## Mandatory checkpoint before changes
 
@@ -27,12 +27,12 @@ Updated: 2026-10-22
 
 ## Active checkpoint
 
-- Current task: 2026-10-22 provenance and architecture documentation FINALIZED.
-- Last Codex implementation: Step 07a shared palette/CSS foundation and Preferences cleanup; last committed baseline 460218f (Step 06). This documentation pass does not advance feature implementation.
-- Later implementation and verification through October 12: credited to Claude AI per user instruction; source comments and docs/WORK_PROVENANCE.md identify mixed ownership.
-- Changed: provenance comments only in mixed source/assets and installer; docs/WORK_PROVENANCE.md; docs/ARCHITECTURE_GUIDE.md; stale checklist statuses reconciled with existing journal.
-- Verification: current source and installed desktop entry inspected; additions checked to preserve every pre-existing byte in annotated executable/style files. No runtime tests or source rebuild needed for comment-only changes; historical validation not repeated.
-- Next action: follow the user's next request. Before further implementation, reconcile remaining 14/16/17/18 checks and 07/19/20 acceptance; do not silently mark those complete.
+- Current task: 2026-10-24 GTK stylesheet/IDE and runtime repairs VERIFIED; publication handoff pending authentication.
+- Changes: GTK-specific asset extension with identical theme bytes; IDE root/backup exclusions; focus cleared before dynamic subtree removal; parser/focus/media validation and regression coverage.
+- Evidence: 40 ordinary tests plus three explicit GTK suites passed, including 30 viewport cases; fmt/build/strict Clippy/diff check/fsck passed. Release installed to ~/.local/bin/lcars-desktop.
+- Baseline: 9e348ad; existing user files, backups and history preserved.
+- Remaining: Calculator currency-rate TLS warning unresolved because user declined system-trust changes. No certificate installed. GitHub terminal authentication unavailable; remote main has unrelated history.
+- Next action: finish local lcars-desktop branch commit/export, then authenticate and push that branch through RustRover or an approved credential flow. Restart older running instances. Whole-project hardware/visual gates remain open.
 
 ## Existing baseline — preserve, do not call final
 
@@ -425,3 +425,13 @@ Not claimed: 18 depends on 15 to 17, and 17 is BLOCKED on hardware, so 18 stays 
 Step 19 is visual and motion polish whose acceptance is the user's judgement against preview-fixtures/reference.jpg, and Step 20's gate requires Steps 01 to 19 FINALIZED or explicit user scope revision. Outstanding blockers: 14a physical touch, 17 cursor and rendering on the real UTM display, and the user's visual sign-off on Step 07 and Step 19.
 
 2026-10-22 / Codex documentation task FINALIZED: marked last Codex Step 07a boundary; credited subsequent work to Claude AI per user direction; added mixed-provenance source comments and architecture guide. Reconciled stale checklist statuses 09–12, 14, 16–18 with the existing journal. Preserved unfinished gates and all functional code. Read-only inspection confirmed installed release launcher and NetworkManager event notification flow. No new hardware/runtime acceptance claimed.
+
+2026-10-24 / repair checkpoint: baseline 40 unit tests/build/Clippy passed. GTK workflow test fails during early resize (before changes); investigating exact call site, not claiming a passing runtime matrix. Stylesheet renamed byte-for-byte to .gtkcss with dedicated GTK parser gate. Remote main and local master have unrelated histories; prepare a separate branch, never force-push. CURRENTLY WORKING ON validation and runtime warning investigation.
+
+2026-10-24 / scope refinement: live RustRover shows historical backup source being inspected. Add project-level content exclusions for backup copies and correct .idea module root (module file lives inside .idea, so project content is its parent). Keep ordinary source inspections enabled.
+
+2026-10-24 / CURRENTLY WORKING ON expanded repair scope: user supplied exact Gtk-CRITICAL gtk_widget_is_ancestor invalid widget assertion during UI actions, plus external gnome-calculator ECB TLS warning. Investigate focused row removal/reparenting with fatal-critical regression and inspect certificate endpoint/trust without disabling TLS. Previous workflow still fails viewport matrix; do not mark verified until resolved.
+
+2026-10-24 / Runtime repair IMPLEMENTED: reproduced the exact gtk_widget_is_ancestor critical with focused Files row removal under G_DEBUG=fatal-criticals. Clear root focus before removing dynamic widget subtrees. Regression now passes, including repeated directory navigation and panel lifecycle. User explicitly declined system trust changes; leave Calculator ECB TLS warning documented and trust untouched. CURRENTLY WORKING ON final full verification, release installation and push preparation.
+
+2026-10-24 / Repair verification VERIFIED: final-verify.log records all ordinary and explicit GTK checks passing. Release installer succeeded. Trust unchanged per user decision. Publication authentication-dependent; no remote push. Evidence exported under Mac Projects/LCARS-Exchange/fix-2026-10-24.

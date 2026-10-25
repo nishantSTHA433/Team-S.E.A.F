@@ -40,7 +40,7 @@ pub fn stylesheet() -> String {
     ] {
         css.push_str(&format!("@define-color lcars_{name} #{color:06x};\n"));
     }
-    css.push_str(include_str!("../assets/lcars.css"));
+    css.push_str(include_str!("../assets/lcars.gtkcss"));
     css.push_str(&format!(
         ".console-region {{ border-left-width:{RAIL}px; border-top-left-radius:{}px; }}\n",
         RAIL + 2
@@ -58,4 +58,26 @@ pub fn stylesheet() -> String {
         ));
     }
     css
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    #[ignore = "requires a GTK display; run via scripts/verify.sh"]
+    fn gtk_stylesheet_parses() {
+        use std::{cell::RefCell, rc::Rc};
+        gtk::init().expect("GTK display required for stylesheet validation");
+        let provider = gtk::CssProvider::new();
+        let errors = Rc::new(RefCell::new(Vec::new()));
+        let captured = errors.clone();
+        provider.connect_parsing_error(move |_, _, error| {
+            captured.borrow_mut().push(error.to_string());
+        });
+        provider.load_from_data(&super::stylesheet());
+        assert!(
+            errors.borrow().is_empty(),
+            "GTK stylesheet diagnostics: {:?}",
+            errors.borrow()
+        );
+    }
 }

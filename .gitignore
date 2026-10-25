@@ -1,2 +1,7 @@
 /target/
 *.log
+
+# Local historical working copies; keep on disk, never publish accidentally.
+/.model01-backup/
+/.responsive04-backup/
+/.visual-round*-backup/

@@ -1,9 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <module type="EMPTY_MODULE" version="4">
   <component name="NewModuleRootManager">
-    <content url="file://$MODULE_DIR$">
-      <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
-      <excludeFolder url="file://$MODULE_DIR$/target" />
+    <content url="file://$MODULE_DIR$/..">
+      <sourceFolder url="file://$MODULE_DIR$/../src" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/../target" />
+      <excludeFolder url="file://$MODULE_DIR$/../.model01-backup" />
+      <excludeFolder url="file://$MODULE_DIR$/../.responsive04-backup" />
+      <excludeFolder url="file://$MODULE_DIR$/../.visual-round10-backup" />
+      <excludeFolder url="file://$MODULE_DIR$/../.visual-round11-backup" />
+      <excludeFolder url="file://$MODULE_DIR$/../.visual-round12-backup" />
+      <excludeFolder url="file://$MODULE_DIR$/../.visual-round3-backup" />
+      <excludeFolder url="file://$MODULE_DIR$/../.visual-round4-backup" />
+      <excludeFolder url="file://$MODULE_DIR$/../.visual-round5-backup" />
+      <excludeFolder url="file://$MODULE_DIR$/../.visual-round6-backup" />
+      <excludeFolder url="file://$MODULE_DIR$/../.visual-round7-backup" />
+      <excludeFolder url="file://$MODULE_DIR$/../.visual-round8-backup" />
+      <excludeFolder url="file://$MODULE_DIR$/../.visual-round9-backup" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

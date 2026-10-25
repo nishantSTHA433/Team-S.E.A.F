@@ -45,6 +45,7 @@ fn render_findings(
     storage: &[crate::services::StorageRow],
     procs: &[crate::services::ProcessRow],
 ) {
+    crate::ui::clear_focus_within(into);
     while let Some(c) = into.first_child() {
         into.remove(&c);
     }
