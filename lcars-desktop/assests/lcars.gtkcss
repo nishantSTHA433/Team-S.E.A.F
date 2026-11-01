@@ -1,0 +1,554 @@
+/* Mixed provenance: Codex consolidated CSS foundation; Claude AI continuation
+ * (user-attributed) refined reference colours, elbows, accents and focus styling.
+ * See docs/WORK_PROVENANCE.md. */
+/* LCARS visual system: one palette, native-size type, open-sided instrument rails. */
+
+* { font-family:"Nimbus Sans Narrow", "DejaVu Sans Condensed", sans-serif; font-size:16px; }
+window, dialog, headerbar { background:@lcars_void; color:@lcars_amber; }
+headerbar { border:0; box-shadow:none; }
+button { background:@lcars_lilac; color:@lcars_void; border:0; border-radius:0; min-height:28px; padding:5px 12px; font-weight:700; box-shadow:none; }
+button:hover { background:@lcars_press; }
+button:active { background:@lcars_amber; }
+button:focus-visible, entry:focus, searchentry:focus-within { outline:2px solid @lcars_amber; outline-offset:1px; }
+button:disabled { opacity:0.42; }
+.primary { background:@lcars_amber; }
+.secondary { background:@lcars_lilac; }
+.danger { background:@lcars_coral; }
+.compact { min-height:24px; padding:4px 12px; background:@lcars_coral; font-size:14px; }
+
+/* Thin identity band retains its original height and rightmost Exit. */
+.masthead { background:@lcars_void; border:0; min-height:32px; padding:2px 8px; }
+.brand { color:@lcars_amber; font-size:26px; font-weight:800; margin-right:4px; }
+.masthead-sub { background:@lcars_rose; color:@lcars_void; min-height:14px; padding:0; margin:6px 0; }
+.header-cap { background:@lcars_amber; border-radius:24px 0 0 24px; margin:5px 0; }
+.header-exit { min-height:24px; padding:0 12px; margin:0; background:@lcars_coral; border-radius:0 14px 14px 0; font-size:14px; }
+
+/* Spatial window chrome: a thin title rail inside a full touch target. */
+.console-surface { background:@lcars_void; padding:3px 5px; }
+.console-region { background:@lcars_void; border:0; border-left:10px solid @lcars_coral; border-top-left-radius:12px; }
+.system-band, .system-band:hover, .system-band:active { background:transparent; border:0; border-radius:0; padding:0; }
+.console-band-title { background:@lcars_coral; color:@lcars_void; min-height:30px; padding:0 10px; border-left:0; border-radius:0; font-size:16px; font-weight:700; }
+.system-band:hover .console-band-title { background:@lcars_press; }
+.window-maximize, .window-minimize, .window-maximize:hover, .window-minimize:hover { background:transparent; border:0; padding:0; min-width:44px; min-height:44px; }
+.window-glyph { color:@lcars_void; min-height:30px; font-size:15px; font-weight:800; }
+.window-maximize .window-glyph { background:@lcars_lilac; }
+.window-minimize .window-glyph { background:@lcars_amber; border-radius:0 15px 15px 0; }
+.window-maximize:hover .window-glyph, .window-minimize:hover .window-glyph { background:@lcars_press; }
+.zoom-target, .zoom-target:hover, .zoom-target:active { background:transparent; border:0; padding:0; box-shadow:none; }
+.resize-handle { background:@lcars_amber; font-size:24px; border-radius:20px 0 0 0; }
+.arrange-selected { border-left-color:@lcars_amber; }
+.arrange-selected .console-band-title { background:@lcars_amber; }
+.arrange-mode { background:@lcars_amber; color:@lcars_void; border-radius:0; }
+.console-region scrolledwindow:disabled, .console-region scrolledwindow:disabled * { opacity:1; }
+
+/* Segmented bars and open instrument frames use the same colors as home. */
+.page-title { background:@lcars_coral; color:@lcars_void; border-left:8px solid @lcars_lilac; border-radius:12px 0 0 0; font-size:18px; font-weight:700; padding:3px 9px; }
+.title-segment-coral { background:@lcars_coral; }
+.title-segment-lilac { background:@lcars_lilac; }
+.title-segment-amber { background:@lcars_amber; border-radius:0 14px 14px 0; }
+.card { background:@lcars_void; border:0; border-left:12px solid @lcars_lilac; border-top:12px solid @lcars_lilac; border-radius:30px 0 0 0; padding:10px 10px 10px 14px; }
+.instrument-title { background:@lcars_coral; color:@lcars_void; padding:3px 9px; font-size:16px; font-weight:700; }
+.telemetry-panel { border-right:0; border-bottom:0; border-left:10px solid @lcars_lilac; border-top:10px solid @lcars_lilac; border-top-left-radius:26px; padding:0 0 8px 6px; }
+.telemetry-panel .metric, .telemetry-panel progressbar { margin:0 12px; }
+.history-panel { background:@lcars_void; border:0; border-left:10px solid @lcars_coral; border-top:10px solid @lcars_coral; border-radius:26px 0 0 0; }
+.metric { color:@lcars_amber; font-size:30px; font-weight:800; }
+.hero { color:@lcars_lilac; font-size:36px; font-weight:800; }
+.eyebrow { color:@lcars_coral; font-size:16px; font-weight:700; }
+.muted { color:@lcars_muted; font-size:14px; }
+.graph-scale { color:@lcars_rose; font-size:13px; margin:0 8px 6px; }
+.strip { background:@lcars_void; border-left:8px solid @lcars_coral; color:@lcars_muted; padding:8px 10px; font-size:15px; }
+.preview-panel { border-bottom:2px solid @lcars_rose; padding-bottom:10px; }
+progressbar trough { min-width:0; min-height:9px; background:@lcars_void; border:1px solid @lcars_coral; border-radius:0; }
+progressbar progress { min-width:0; min-height:9px; background:@lcars_coral; border:0; border-radius:0; padding:0; margin:0; }
+
+/* Data stays readable at native pixels; selected rows use inverse LCARS colors. */
+entry, searchentry { background:@lcars_void; color:@lcars_amber; border:1px solid @lcars_lilac; border-radius:0; min-height:30px; padding:6px 9px; }
+.directory { background:@lcars_void; border-left:3px solid @lcars_lilac; border-radius:0; }
+.directory row { border-bottom:1px solid @lcars_rule; }
+.directory row:selected { background:@lcars_lilac; color:@lcars_void; }
+.directory row:selected .file-row, .directory row:selected .muted { color:@lcars_void; }
+.file-row { color:@lcars_amber; padding:6px 8px; font-size:16px; }
+.file-headings { background:@lcars_lilac; padding:3px 8px; border-bottom:3px solid @lcars_void; }
+.table-heading { color:@lcars_void; font-size:16px; font-weight:700; }
+.app-tile { background:@lcars_void; color:@lcars_amber; border-bottom:2px solid @lcars_coral; border-left:7px solid @lcars_coral; padding:10px 10px 10px 14px; }
+.app-tile:hover { background:@lcars_lilac; color:@lcars_void; }
+textview, textview text { background:@lcars_void; color:@lcars_muted; font-family:monospace; font-size:13px; }
+checkbutton { color:@lcars_muted; padding:8px; }
+checkbutton check { background:@lcars_void; color:@lcars_void; border:2px solid @lcars_lilac; border-radius:0; min-width:22px; min-height:22px; }
+checkbutton check:checked { background:@lcars_amber; border-color:@lcars_amber; }
+scrollbar slider { background:@lcars_lilac; border-radius:0; min-width:6px; min-height:24px; }
+scrollbar trough { background:@lcars_void; }
+
+/* Bottom access rail and matching popovers. */
+.footer { background:@lcars_void; border-top:4px solid @lcars_rose; padding:5px 8px; }
+.console-clock { color:@lcars_amber; font-size:20px; font-weight:800; }
+.status { color:@lcars_amber; font-size:14px; font-weight:700; }
+.warning { color:@lcars_alert; }
+.alert-banner { background:@lcars_amber; color:@lcars_void; padding:8px 12px; font-weight:800; }
+.dock-button { background:@lcars_lilac; color:@lcars_void; border-top:3px solid @lcars_rose; padding:3px 12px; font-size:16px; }
+.dock-button:first-child { background:@lcars_amber; border-radius:18px 0 0 18px; }
+.dock-button:nth-child(3) { background:@lcars_coral; }
+.dock-button:nth-child(4) { background:@lcars_rose; }
+.start-button > button { background:@lcars_amber; color:@lcars_void; border-radius:26px 0 0 26px; padding:6px 15px; font-size:18px; font-weight:700; }
+popover > contents { background:@lcars_void; color:@lcars_amber; border:2px solid @lcars_lilac; border-radius:12px 0 12px 0; padding:8px; }
+.lcars-start-menu > contents { border-left:12px solid @lcars_coral; border-radius:26px 0 0 0; padding:12px; }
+.start-app { background:@lcars_void; color:@lcars_amber; border-bottom:1px solid @lcars_rule; padding:6px 10px; font-size:16px; }
+.start-app:hover { background:@lcars_lilac; color:@lcars_void; }
+.start-system { background:@lcars_lilac; font-size:18px; }
+.start-system:nth-child(3), .start-system:nth-child(6) { background:@lcars_coral; }
+.arrange-mode popover row { min-height:44px; color:@lcars_amber; background:@lcars_void; }
+.arrange-mode popover row:selected { background:@lcars_lilac; color:@lcars_void; }
+
+
+/* Modern LCARS file explorer — scoped so other pages retain their original look. */
+.modern-files-page { background: @lcars_void; padding-bottom: 14px; }
+.modern-files-page .page-title {
+    background: transparent;
+    color: @lcars_lilac;
+    border-left: 5px solid @lcars_amber;
+    border-radius: 0;
+    padding: 2px 10px;
+    font-size: 17px;
+}
+.modern-files-page .title-segment-coral { background: @lcars_amber; }
+.modern-files-page .title-segment-lilac { background: #78dce6; }
+.modern-files-page .title-segment-amber { background: @lcars_coral; }
+.files-hero {
+    background: alpha(@lcars_lilac, 0.09);
+    border: 1px solid alpha(#78dce6, 0.30);
+    border-left: 5px solid @lcars_amber;
+    border-radius: 15px;
+    padding: 16px 18px;
+    margin: 2px 0 8px;
+}
+.files-eyebrow {
+    color: #78dce6;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 2px;
+}
+.files-hero-title {
+    color: @lcars_lilac;
+    font-size: 25px;
+    font-weight: 800;
+}
+.files-hero-subtitle { color: @lcars_muted; font-size: 13px; }
+.files-toolbar { margin-top: 2px; }
+.files-nav-button {
+    background: alpha(@lcars_lilac, 0.16);
+    color: @lcars_lilac;
+    border: 1px solid alpha(@lcars_lilac, 0.32);
+    border-radius: 9px;
+    min-width: 48px;
+    min-height: 42px;
+}
+.files-nav-button:hover { background: alpha(#78dce6, 0.22); color: #78dce6; }
+.files-path-entry, .modern-files-page searchentry {
+    background: #151e32;
+    color: @lcars_lilac;
+    border: 1px solid #34445f;
+    border-radius: 9px;
+    min-height: 42px;
+    padding: 7px 12px;
+}
+.files-path-entry:focus, .modern-files-page searchentry:focus-within {
+    border-color: #78dce6;
+    outline: 1px solid #78dce6;
+}
+.files-go-button {
+    background: @lcars_amber;
+    color: @lcars_void;
+    border-radius: 9px;
+    min-height: 42px;
+    padding-left: 16px;
+    padding-right: 16px;
+}
+.files-go-button:hover { background: @lcars_press; }
+.files-search { margin: 0 0 4px; }
+.files-shortcuts { margin: 2px 0 4px; }
+.files-shortcut-button {
+    background: alpha(@lcars_coral, 0.15);
+    color: @lcars_lilac;
+    border: 1px solid alpha(@lcars_coral, 0.38);
+    border-radius: 9px;
+    min-height: 40px;
+    padding: 7px 15px;
+}
+.files-shortcut-button:hover {
+    background: alpha(@lcars_coral, 0.28);
+    border-color: @lcars_coral;
+}
+.files-mounted-volumes button {
+    background: alpha(#78dce6, 0.12);
+    color: #78dce6;
+    border: 1px solid alpha(#78dce6, 0.35);
+    border-radius: 8px;
+}
+.files-status-line {
+    color: #78dce6;
+    font-size: 12px;
+    padding: 2px 3px;
+}
+.files-list-card {
+    background: #10192b;
+    border: 1px solid #2d3c57;
+    border-radius: 14px;
+    padding: 9px;
+}
+.files-list-heading {
+    background: #1c2940;
+    border: 0;
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+.files-list-heading .table-heading {
+    color: #78dce6;
+    font-size: 12px;
+    letter-spacing: 1px;
+}
+.files-directory-list {
+    background: transparent;
+    border: 0;
+    padding: 3px 0;
+}
+.files-directory-list row {
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid alpha(@lcars_lilac, 0.12);
+    border-radius: 7px;
+    min-height: 48px;
+    margin: 1px 0;
+}
+.files-directory-list row:hover { background: alpha(#78dce6, 0.09); }
+.files-directory-list row:selected {
+    background: alpha(#78dce6, 0.20);
+    outline: 1px solid alpha(#78dce6, 0.55);
+}
+.files-directory-list row:selected .file-name,
+.files-directory-list row:selected .muted { color: @lcars_lilac; }
+.files-directory-list .file-name {
+    color: @lcars_amber;
+    font-size: 15px;
+    padding: 7px 5px;
+}
+.files-directory-list .muted {
+    color: @lcars_muted;
+    font-size: 12px;
+}
+
+/* Unified Modern LCARS treatment for Apps, Network, Settings and Tools.
+   Scoped to these section roots so the Home dashboard and Files browser retain
+   their own established styling and behavior. */
+.modern-section {
+    background: #0d1424;
+    color: @lcars_lilac;
+    padding-bottom: 16px;
+}
+.modern-section .page-title {
+    background: transparent;
+    color: @lcars_lilac;
+    border-left: 5px solid @lcars_amber;
+    border-radius: 0;
+    padding: 3px 11px;
+    font-size: 18px;
+}
+.modern-section .title-segment-coral { background: @lcars_amber; }
+.modern-section .title-segment-lilac { background: #78dce6; }
+.modern-section .title-segment-amber { background: @lcars_coral; }
+.modern-section .card,
+.modern-section .telemetry-panel,
+.modern-section .history-panel,
+.modern-section .preview-panel {
+    background: #111b2e;
+    border: 1px solid #2d405b;
+    border-left: 4px solid @lcars_amber;
+    border-top: 1px solid #2d405b;
+    border-radius: 12px;
+    padding: 12px;
+}
+.modern-section .instrument-title {
+    background: transparent;
+    color: #78dce6;
+    border-bottom: 1px solid alpha(#78dce6, 0.24);
+    padding: 3px 2px 7px;
+    font-size: 13px;
+    letter-spacing: 1px;
+}
+.modern-section button {
+    background: #202b43;
+    color: @lcars_lilac;
+    border: 1px solid #3b4d69;
+    border-radius: 8px;
+    min-height: 40px;
+    padding: 7px 14px;
+}
+.modern-section button:hover {
+    background: alpha(#78dce6, 0.18);
+    color: #78dce6;
+    border-color: #78dce6;
+}
+.modern-section button.primary,
+.modern-section button.suggested-action {
+    background: @lcars_amber;
+    color: #101522;
+    border-color: @lcars_amber;
+}
+.modern-section button.danger,
+.modern-section button.destructive-action {
+    background: alpha(@lcars_coral, 0.22);
+    color: #f0a0a0;
+    border-color: alpha(@lcars_coral, 0.65);
+}
+.modern-section entry,
+.modern-section searchentry,
+.modern-section textview,
+.modern-section textview text {
+    background: #151f33;
+    color: @lcars_lilac;
+    border: 1px solid #354762;
+    border-radius: 8px;
+    padding: 7px 10px;
+}
+.modern-section entry:focus,
+.modern-section searchentry:focus-within {
+    border-color: #78dce6;
+    outline: 1px solid #78dce6;
+}
+.modern-section .directory {
+    background: #101a2c;
+    border: 1px solid #2d405b;
+    border-radius: 10px;
+}
+.modern-section .directory row {
+    background: transparent;
+    border-bottom: 1px solid alpha(@lcars_lilac, 0.12);
+    border-radius: 6px;
+}
+.modern-section .directory row:hover { background: alpha(#78dce6, 0.08); }
+.modern-section .directory row:selected {
+    background: alpha(#78dce6, 0.20);
+    color: @lcars_lilac;
+}
+.modern-section .file-headings {
+    background: #1c2940;
+    border: 0;
+    border-radius: 7px;
+    padding: 7px 9px;
+}
+.modern-section .table-heading { color: #78dce6; font-size: 12px; }
+.modern-section .file-row { color: @lcars_lilac; }
+.modern-section .muted { color: #a3aec7; }
+.modern-section .strip {
+    background: #151f33;
+    color: #78dce6;
+    border-left: 4px solid @lcars_amber;
+    border-radius: 7px;
+}
+.modern-section checkbutton { color: @lcars_lilac; }
+.modern-section checkbutton check {
+    background: #151f33;
+    border: 1px solid #526681;
+    border-radius: 5px;
+}
+.modern-section checkbutton check:checked {
+    background: @lcars_amber;
+    border-color: @lcars_amber;
+}
+.modern-section progressbar trough {
+    background: #0c1423;
+    border: 1px solid #354762;
+    border-radius: 7px;
+    min-height: 10px;
+}
+.modern-section progressbar progress {
+    background: linear-gradient(to right, @lcars_amber, #78dce6);
+    border-radius: 7px;
+    min-height: 10px;
+}
+.modern-section scrollbar slider { background: #526681; border-radius: 8px; }
+
+
+/* -------------------------------------------------------------------------
+   MODERN LCARS SHARED SECTION SKIN
+   Applied to Apps, Network, Settings and Tools. Files keeps its dedicated
+   layout rules; these shared tokens make every page feel like one interface.
+   ------------------------------------------------------------------------- */
+.modern-section-page {
+    background: #0c1221;
+    color: #e5e8f5;
+    padding: 4px 2px 14px;
+}
+.modern-section-page .page-title {
+    background: #c9676d;
+    color: #080d18;
+    border-left: 7px solid #9c99ff;
+    border-radius: 12px 0 0 0;
+    padding: 6px 12px;
+    min-height: 34px;
+    font-size: 19px;
+}
+.modern-section-page .muted,
+.modern-section-page .strip {
+    color: #aeb8d2;
+}
+.modern-section-page .eyebrow,
+.modern-section-page .instrument-title {
+    color: #78dce6;
+    background: transparent;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    padding: 5px 2px;
+}
+.modern-section-page .card,
+.modern-section-page .telemetry-panel,
+.modern-section-page .history-panel,
+.modern-section-page .preview-panel,
+.modern-section-page .modern-panel {
+    background: #111b2e;
+    color: #e5e8f5;
+    border: 1px solid #30415d;
+    border-left: 4px solid #ff9900;
+    border-top: 1px solid #30415d;
+    border-radius: 13px;
+    padding: 14px;
+    margin: 3px 0;
+}
+.modern-section-page button,
+.modern-section-page .primary,
+.modern-section-page .secondary,
+.modern-section-page .compact,
+.modern-section-page .app-tile {
+    background: #19243a;
+    color: #dfe7fa;
+    border: 1px solid #3b4c69;
+    border-radius: 9px;
+    min-height: 42px;
+    padding: 7px 14px;
+    font-weight: 700;
+}
+.modern-section-page button.primary {
+    background: #ff9900;
+    color: #111827;
+    border-color: #ffb43b;
+}
+.modern-section-page button:hover,
+.modern-section-page .app-tile:hover {
+    background: alpha(#78dce6, 0.18);
+    color: #78dce6;
+    border-color: #78dce6;
+}
+.modern-section-page button.primary:hover {
+    background: #ffbd59;
+    color: #101827;
+}
+.modern-section-page entry,
+.modern-section-page searchentry,
+.modern-section-page textview,
+.modern-section-page textview text {
+    background: #151f33;
+    color: #e3e9f8;
+    border: 1px solid #344660;
+    border-radius: 9px;
+    padding: 8px 11px;
+    caret-color: #78dce6;
+}
+.modern-section-page entry:focus,
+.modern-section-page searchentry:focus-within {
+    border-color: #78dce6;
+    outline: 1px solid alpha(#78dce6, 0.45);
+}
+.modern-section-page .directory,
+.modern-section-page list {
+    background: #10192b;
+    border: 1px solid #2d3c57;
+    border-radius: 12px;
+    padding: 5px;
+}
+.modern-section-page .directory row,
+.modern-section-page list row {
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid alpha(#9c99ff, 0.14);
+    border-radius: 7px;
+    min-height: 48px;
+    margin: 1px 0;
+}
+.modern-section-page .directory row:hover,
+.modern-section-page list row:hover {
+    background: alpha(#78dce6, 0.09);
+}
+.modern-section-page .directory row:selected,
+.modern-section-page list row:selected {
+    background: alpha(#78dce6, 0.20);
+    outline: 1px solid alpha(#78dce6, 0.55);
+}
+.modern-section-page checkbutton {
+    color: #dfe7fa;
+    padding: 10px;
+}
+.modern-section-page checkbutton check {
+    background: #151f33;
+    border: 2px solid #78dce6;
+    border-radius: 5px;
+    min-width: 21px;
+    min-height: 21px;
+}
+.modern-section-page checkbutton check:checked {
+    background: #ff9900;
+    border-color: #ff9900;
+}
+.modern-section-page progressbar trough {
+    background: #151f33;
+    border: 1px solid #344660;
+    border-radius: 8px;
+    min-height: 10px;
+}
+.modern-section-page progressbar progress {
+    background: #78dce6;
+    border-radius: 8px;
+    min-height: 10px;
+}
+.modern-section-page .metric {
+    color: #ffbd59;
+}
+.modern-section-page .status {
+    color: #78dce6;
+}
+.modern-section-page .table-heading {
+    color: #78dce6;
+    font-size: 12px;
+    letter-spacing: 1px;
+}
+.modern-section-page scrollbar slider {
+    background: #65799b;
+    border-radius: 8px;
+}
+.modern-section-page .files-hero,
+.modern-section-page .files-list-card {
+    background: #111b2e;
+}
+
+
+/* Sidebar collapse/expand control */
+.sidebar-collapse-button {
+    background: #34304f;
+    color: #ffbd59;
+    border: 1px solid #78dce6;
+    border-radius: 10px;
+    min-width: 56px;
+    min-height: 56px;
+    padding: 0;
+    font-size: 30px;
+    font-weight: 900;
+}
+.sidebar-collapse-button:hover {
+    background: #78dce6;
+    color: #101827;
+}
+.sidebar-nav-button {
+    min-height: 54px;
+    padding: 0 12px;
+    font-size: 16px;
+    transition: none;
+}
