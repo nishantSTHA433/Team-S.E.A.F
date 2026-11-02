@@ -1,5 +1,4 @@
 //! Explicit user-task demand; telemetry is deliberately not an input.
-//! This is a test.
 use crate::workspace::PanelId;
 #[derive(Clone, Copy, Debug)]
 pub enum Task {
