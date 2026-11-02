@@ -119,6 +119,7 @@ fn button(text: &str, class: &str) -> gtk::Button {
 
 fn page(title: &str, subtitle: &str) -> gtk::Box {
     let p = column(10);
+    p.add_css_class("modern-section-page");
     p.set_margin_top(10);
     p.set_margin_bottom(10);
     p.set_margin_start(24);
@@ -171,6 +172,8 @@ const PANELS: [(&str, &str); 6] = lcars_desktop::workspace::PANEL_CATALOG;
 #[path = "console.rs"]
 mod console;
 
+/// Retained for an optional future Start menu.
+#[allow(dead_code)]
 fn start_menu(navigate: Navigate) -> gtk::MenuButton {
     let start = gtk::MenuButton::new();
     start.set_label("LCARS / START");
@@ -307,7 +310,10 @@ pub fn build(app: &gtk::Application) {
         .default_width(1080)
         .default_height(700)
         .build();
-    let preferences = Rc::new(RefCell::new(Preferences::load()));
+    // Start in Desktop Mode every time; Console Mode remains available in Settings.
+    let mut startup_preferences = Preferences::load();
+    startup_preferences.workspace_mode = false;
+    let preferences = Rc::new(RefCell::new(startup_preferences));
     let console_data = Rc::new(RefCell::new(console::InstrumentData::default()));
     let root = column(0);
     let header = row(5);
@@ -364,25 +370,82 @@ pub fn build(app: &gtk::Application) {
         "SYSTEM OVERVIEW",
         "FEDORA / ARM64     •     LIVE GUEST TELEMETRY",
     );
+    dashboard.set_vexpand(true);
+    dashboard.set_hexpand(true);
+    dashboard.add_css_class("home-dashboard");
     let hero = row(12);
-    let hero_text = column(8);
+    hero.set_hexpand(true);
+    hero.set_vexpand(true);
+    let hero_text = column(12);
+    hero_text.set_vexpand(true);
+    hero_text.set_valign(gtk::Align::Center);
     hero_text.set_hexpand(true);
+    hero_text.set_size_request(140, -1);
     hero_text.append(&label("SYSTEM AVAILABLE", "hero"));
     hero_text.append(&label("STATION ID 1440–900  /  OPERATIONS ONLINE", "muted"));
+    hero_text.append(&label("LOCAL SYSTEM TIME", "instrument-title"));
+    let home_time = label(
+        &glib::DateTime::now_local()
+            .and_then(|t| t.format("%I:%M:%S %p"))
+            .map(|s| s.to_string())
+            .unwrap_or_else(|_| "--:--:--".to_string()),
+        "hero",
+    );
+    home_time.set_selectable(true);
+    hero_text.append(&home_time);
     let emblem = gtk::DrawingArea::new();
-    emblem.set_content_width(160);
-    emblem.set_content_height(160);
+    emblem.set_content_width(190);
+    emblem.set_content_height(190);
+    emblem.set_hexpand(true);
+    emblem.set_vexpand(true);
     emblem.set_draw_func(draw_emblem);
     hero.append(&emblem);
+
+    // Compact live resource meters use the open space beside the station emblem.
+    let resource_panel = column(12);
+    resource_panel.add_css_class("history-panel");
+    resource_panel.set_width_request(220);
+    resource_panel.set_hexpand(true);
+    resource_panel.set_vexpand(true);
+    resource_panel.append(&label("RESOURCE LOAD", "instrument-title"));
+    let cpu_mini_value = label("CPU  /  —", "graph-scale");
+    cpu_mini_value.add_css_class("cpu-meter-label");
+    let cpu_mini_bar = gtk::ProgressBar::new();
+    cpu_mini_bar.add_css_class("cpu-meter");
+    cpu_mini_bar.set_show_text(false);
+    cpu_mini_bar.set_height_request(24);
+    resource_panel.append(&cpu_mini_value);
+    resource_panel.append(&cpu_mini_bar);
+    let ram_mini_value = label("RAM  /  —", "graph-scale");
+    ram_mini_value.add_css_class("ram-meter-label");
+    let ram_mini_bar = gtk::ProgressBar::new();
+    ram_mini_bar.add_css_class("ram-meter");
+    ram_mini_bar.set_show_text(false);
+    ram_mini_bar.set_height_request(24);
+    resource_panel.append(&ram_mini_value);
+    resource_panel.append(&ram_mini_bar);
+    let storage_mini_value = label("STORAGE  /  —", "graph-scale");
+    storage_mini_value.add_css_class("storage-meter-label");
+    let storage_mini_bar = gtk::ProgressBar::new();
+    storage_mini_bar.add_css_class("storage-meter");
+    storage_mini_bar.set_show_text(false);
+    storage_mini_bar.set_height_request(24);
+    resource_panel.append(&storage_mini_value);
+    resource_panel.append(&storage_mini_bar);
+    hero.append(&resource_panel);
     hero.append(&hero_text);
     let history = Rc::new(RefCell::new(VecDeque::<f64>::with_capacity(60)));
-    let history_panel = column(6);
+    let history_panel = column(12);
     history_panel.add_css_class("history-panel");
-    history_panel.set_width_request(210);
+    history_panel.set_width_request(220);
+    history_panel.set_hexpand(true);
+    history_panel.set_vexpand(true);
     history_panel.append(&label("CPU / RECENT HISTORY", "instrument-title"));
     let plot = gtk::DrawingArea::new();
     plot.set_content_width(200);
-    plot.set_content_height(88);
+    plot.set_content_height(140);
+    plot.set_hexpand(true);
+    plot.set_vexpand(true);
     plot.set_tooltip_text(Some(
         "CPU utilization: 0–100%. Up to 60 recent telemetry samples; newest at right.",
     ));
@@ -421,17 +484,22 @@ pub fn build(app: &gtk::Application) {
     history_panel.append(&label("0–100% / LIVE SAMPLES", "graph-scale"));
     hero.append(&history_panel);
     dashboard.append(&hero);
-    adaptive_row(&hero, dashboard.upcast_ref(), 760);
+    adaptive_row(&hero, dashboard.upcast_ref(), 820);
     let metrics = gtk::Grid::builder()
         .column_spacing(14)
         .row_spacing(14)
         .column_homogeneous(true)
         .build();
+    metrics.set_vexpand(true);
+    metrics.set_hexpand(true);
     let (cpu_card, cpu_value, cpu_bar) = card("01 / PROCESSOR LOAD");
     let (mem_card, mem_value, mem_bar) = card("02 / MEMORY UTILIZATION");
     let (net_card, net_value, net_bar) = card("03 / NETWORK RECEIVE");
     net_bar.set_visible(false);
     let (time_card, time_value, time_bar) = card("04 / SYSTEM UPTIME");
+    for metric_card in [&cpu_card, &mem_card, &net_card, &time_card] {
+        metric_card.set_vexpand(true);
+    }
     time_bar.set_visible(false);
     metrics.attach(&cpu_card, 0, 0, 1, 1);
     metrics.attach(&mem_card, 1, 0, 1, 1);
@@ -473,9 +541,6 @@ pub fn build(app: &gtk::Application) {
         }
         glib::ControlFlow::Continue
     });
-    let storage = label("STORAGE / Reading filesystem…", "strip");
-    dashboard.append(&storage);
-    dashboard.append(&label("Virtual machine readings reflect Fedora, not the Mac host. Sensors not exposed by UTM are unavailable.", "muted"));
     stack.add_named(&scrolled(&dashboard), Some("dashboard"));
     stack.add_named(
         &scrolled(&files_page(&window, &console_data)),
@@ -490,16 +555,13 @@ pub fn build(app: &gtk::Application) {
     console_data.borrow_mut().sources.diagnostics = Some(diagnostics);
     stack.add_named(&scrolled(&tools_page), Some("tools"));
     let settings = settings_page(&preferences);
-    let session_controls = row(8);
-    session_controls.append(&full);
-
-    settings.prepend(&session_controls);
     let workspace_toggle =
         gtk::CheckButton::with_label("CONSOLE MODE — touch / zoom / arrange (off: Desktop mode)");
     workspace_toggle.set_height_request(48);
     workspace_toggle.set_active(preferences.borrow().workspace_mode);
     settings.prepend(&workspace_toggle);
     stack.add_named(&scrolled(&settings), Some("settings"));
+    stack.set_visible_child_name("dashboard");
     let (page_host, navigate_panel, set_mode) =
         console::build(&stack, &preferences, console_data.clone());
     let mode_result = label("", "muted");
@@ -519,7 +581,15 @@ pub fn build(app: &gtk::Application) {
         let go = navigate_panel.clone();
         let toggle = workspace_toggle.clone();
         Rc::new(move |name| {
-            if name.starts_with("__") {
+            // In Desktop Mode, HOME in the Start menu means the dashboard;
+            // it must not unexpectedly switch the whole application to Console Mode.
+            if name == "__home" && !toggle.is_active() {
+                go("dashboard");
+                return;
+            }
+            // Arrange and Auto Fit are Console Mode commands, so entering that
+            // mode is intentional only when one of those commands is selected.
+            if (name == "__arrange" || name == "__auto") && !toggle.is_active() {
                 toggle.set_active(true);
             }
             go(name);
@@ -537,40 +607,134 @@ pub fn build(app: &gtk::Application) {
         layout_controls.append(&control);
     }
     settings.prepend(&layout_controls);
+    // Persistent left navigation: each item opens one page in the main area.
+    let sidebar = column(8);
+    sidebar.add_css_class("history-panel");
+    // Keep the expanded rail close to the reference layout (~300 px including
+    // its outer margins), and prevent the horizontal body box from stretching it.
+    sidebar.set_width_request(280);
+    sidebar.set_hexpand(false);
+    sidebar.set_halign(gtk::Align::Start);
+    sidebar.set_homogeneous(false);
+    sidebar.set_valign(gtk::Align::Fill);
+    sidebar.set_margin_top(12);
+    sidebar.set_margin_bottom(12);
+    sidebar.set_margin_start(10);
+    sidebar.set_margin_end(6);
+
+    // The larger control remains visible when the navigation is fully collapsed.
+    let sidebar_header = row(4);
+    sidebar_header.set_halign(gtk::Align::Center);
+    let sidebar_toggle = button("‹", "sidebar-collapse-button");
+    sidebar_toggle.set_size_request(56, 56);
+    sidebar_toggle.set_tooltip_text(Some("Collapse sidebar"));
+    sidebar_header.append(&sidebar_toggle);
+    sidebar.append(&sidebar_header);
+
+    let mut sidebar_buttons: Vec<(String, gtk::Button)> = Vec::new();
+    for (title, target) in [
+        ("HOME", "dashboard"),
+        ("FILES", "files"),
+        ("NETWORK", "network"),
+        ("APPS", "apps"),
+        ("TOOLS", "tools"),
+        ("SETTINGS", "settings"),
+    ] {
+        let entry = button(title, "dock-button");
+        entry.add_css_class("sidebar-nav-button");
+        entry.set_size_request(-1, 54);
+        entry.set_height_request(54);
+        entry.set_vexpand(false);
+        entry.set_valign(gtk::Align::Start);
+        entry.set_hexpand(true);
+        entry.set_halign(gtk::Align::Fill);
+        entry.set_tooltip_text(Some(title));
+        if target == "dashboard" {
+            entry.set_margin_top(4);
+        }
+        let navigate = navigate_panel.clone();
+        entry.connect_clicked(move |_| navigate(target));
+        sidebar.append(&entry);
+        sidebar_buttons.push((target.to_string(), entry));
+    }
+
+    // Keep fullscreen beside the other section controls in the left sidebar.
+    full.add_css_class("sidebar-nav-button");
+    full.set_size_request(-1, 54);
+    full.set_height_request(54);
+    full.set_vexpand(false);
+    full.set_valign(gtk::Align::Start);
+    full.set_hexpand(true);
+    full.set_halign(gtk::Align::Fill);
+    full.set_tooltip_text(Some("Toggle fullscreen"));
+    sidebar.append(&full);
+
+    // Fully collapsed mode hides every section and fullscreen button. Only the
+    // larger expand control remains, leaving almost all horizontal space to the page.
+    let collapsed = Rc::new(Cell::new(false));
+    let toggle_sidebar = sidebar.clone();
+    let toggle_buttons = sidebar_buttons.clone();
+    let toggle_full = full.clone();
+    let toggle_state = collapsed.clone();
+    let toggle_control = sidebar_toggle.clone();
+    sidebar_toggle.connect_clicked(move |_| {
+        let next = !toggle_state.get();
+        toggle_state.set(next);
+
+        if next {
+            toggle_sidebar.set_width_request(64);
+            toggle_sidebar.set_margin_start(2);
+            toggle_sidebar.set_margin_end(2);
+            toggle_control.set_label("›");
+            toggle_control.set_tooltip_text(Some("Expand navigation"));
+        } else {
+            toggle_sidebar.set_width_request(280);
+            toggle_sidebar.set_margin_start(10);
+            toggle_sidebar.set_margin_end(6);
+            toggle_control.set_label("‹");
+            toggle_control.set_tooltip_text(Some("Collapse navigation"));
+        }
+
+        for (_, nav_button) in &toggle_buttons {
+            nav_button.set_visible(!next);
+        }
+        toggle_full.set_visible(!next);
+    });
+
+    page_host.set_hexpand(true);
+    page_host.set_halign(gtk::Align::Fill);
+    body.append(&sidebar);
     body.append(&page_host);
     root.append(&body);
     let footer = row(12);
     footer.add_css_class("footer");
-    let indicator = label("● CHECKING NETWORK", "status");
+    let indicator = label("CHECKING NETWORK", "status");
     indicator.set_ellipsize(gtk::pango::EllipsizeMode::End);
     indicator.set_max_width_chars(22);
     indicator.set_width_chars(22);
+
+    // Compact Wi-Fi status control replaces the old LCARS / START menu.
+    // Clicking it opens the Network page; its symbol follows NetworkManager state.
+    let wifi_image = gtk::Image::from_icon_name("network-wireless-acquiring-symbolic");
+    wifi_image.set_pixel_size(24);
+    let wifi_button = gtk::Button::new();
+    wifi_button.set_child(Some(&wifi_image));
+    wifi_button.add_css_class("wifi-status-button");
+    wifi_button.set_tooltip_text(Some("Network status: checking"));
+    // The Wi-Fi status button is a desktop navigation shortcut only.
+    // If Console Mode is active, explicitly return to Desktop Mode first,
+    // then open the Network page. Repeated clicks must never toggle modes.
+    let open_network = navigate_panel.clone();
+    let desktop_mode_toggle = workspace_toggle.clone();
+    wifi_button.connect_clicked(move |_| {
+        if desktop_mode_toggle.is_active() {
+            desktop_mode_toggle.set_active(false);
+        }
+        open_network("network");
+    });
+
     let clock = label("", "console-clock");
-    let start = start_menu(navigate_panel.clone());
-    footer.append(&start);
-    let shortcuts = row(6);
-    let shortcut_scroll = gtk::ScrolledWindow::builder()
-        .hscrollbar_policy(gtk::PolicyType::Automatic)
-        .vscrollbar_policy(gtk::PolicyType::Never)
-        .hexpand(true)
-        .child(&shortcuts)
-        .build();
-    shortcut_scroll.update_property(&[gtk::accessible::Property::Label(
-        "System shortcuts; scroll horizontally for more",
-    )]);
-    for (title, target) in [
-        ("SYSTEM", "dashboard"),
-        ("FILES", "files"),
-        ("NETWORK", "network"),
-        ("TOOLS", "tools"),
-    ] {
-        let shortcut = button(title, "dock-button");
-        shortcut.set_height_request(48);
-        let navigate = navigate_panel.clone();
-        shortcut.connect_clicked(move |_| navigate(target));
-        shortcuts.append(&shortcut);
-    }
-    footer.append(&shortcut_scroll);
+    footer.append(&wifi_button);
     footer.append(&indicator);
     footer.append(&clock);
     root.append(&footer);
@@ -589,11 +753,28 @@ pub fn build(app: &gtk::Application) {
     window.add_controller(motion);
     let notification_app = app.clone();
     let network_indicator = indicator.clone();
+    let network_icon = wifi_image.clone();
+    let network_button = wifi_button.clone();
     let ns = network_status.clone();
     let prefs = preferences.clone();
     let last_state = Rc::new(RefCell::new(String::new()));
     crate::network::subscribe(move |state| {
-        network_indicator.set_text(&format!("● NETWORK {state}"));
+        let (icon_name, status_text) = match state.as_str() {
+            "ONLINE" => ("network-wireless-signal-excellent-symbolic", "Connected"),
+            "LOCAL / UNVERIFIED" => ("network-wireless-signal-good-symbolic", "Local connection"),
+            "LIMITED" => ("network-wireless-signal-weak-symbolic", "Limited connection"),
+            "CAPTIVE PORTAL" => ("network-wireless-signal-weak-symbolic", "Sign-in required"),
+            "OFFLINE" => ("network-wireless-offline-symbolic", "Offline"),
+            _ => ("network-wireless-acquiring-symbolic", "Status unknown"),
+        };
+        network_icon.set_icon_name(Some(icon_name));
+        if state == "OFFLINE" {
+            network_button.add_css_class("network-offline");
+        } else {
+            network_button.remove_css_class("network-offline");
+        }
+        network_button.set_tooltip_text(Some(&format!("Network: {status_text}")));
+        network_indicator.set_text(&format!("NETWORK {state}"));
         ns.set_text(&format!("{state} / NetworkManager live events"));
         let degraded = state != "ONLINE";
         alert.set_visible(degraded);
@@ -647,12 +828,7 @@ pub fn build(app: &gtk::Application) {
     let keys = gtk::EventControllerKey::new();
     let weak = window.downgrade();
     let shortcut_navigation = navigate_panel.clone();
-    let start_popup = start.popover().expect("Start popover");
     keys.connect_key_pressed(move |_, key, _, modifiers| {
-        if key == gtk::gdk::Key::Escape && start_popup.is_visible() {
-            start_popup.popdown();
-            return glib::Propagation::Stop;
-        }
         if modifiers.contains(gtk::gdk::ModifierType::ALT_MASK) {
             let target = match key {
                 gtk::gdk::Key::_1 => Some("dashboard"),
@@ -714,6 +890,15 @@ pub fn build(app: &gtk::Application) {
             plot.queue_draw();
             cpu_value.set_text(&format!("{:.0}%", s.cpu));
             cpu_bar.set_fraction(s.cpu / 100.0);
+            cpu_mini_value.set_text(&format!("CPU  /  {:.0}%", s.cpu));
+            cpu_mini_bar.set_fraction((s.cpu / 100.0).clamp(0.0, 1.0));
+            let memory_fraction = if s.memory_total > 0 {
+                s.memory_used as f64 / s.memory_total as f64
+            } else {
+                0.0
+            };
+            ram_mini_value.set_text(&format!("RAM  /  {:.0}%", memory_fraction * 100.0));
+            ram_mini_bar.set_fraction(memory_fraction.clamp(0.0, 1.0));
             mem_value.set_text(&format!(
                 "{:.1} / {:.1} GiB",
                 s.memory_used as f64 / 1073741824.0,
@@ -730,18 +915,28 @@ pub fn build(app: &gtk::Application) {
                 s.uptime / 3600,
                 (s.uptime % 3600) / 60
             ));
-            storage.set_text(&format!(
-                "STORAGE / SIZE · USED · AVAILABLE · USE\n{}",
-                s.storage
-            ));
+            let storage_fields: Vec<&str> = s.storage.split_whitespace().collect();
+            if let Some(percent) = storage_fields.get(3).and_then(|v| v.trim_end_matches('%').parse::<f64>().ok()) {
+                storage_mini_value.set_text(&format!("STORAGE  /  {:.0}%", percent));
+                storage_mini_bar.set_fraction((percent / 100.0).clamp(0.0, 1.0));
+            } else {
+                storage_mini_value.set_text("STORAGE  /  N/A");
+                storage_mini_bar.set_fraction(0.0);
+            }
             if !s.error.is_empty() {
                 indicator.set_tooltip_text(Some(&s.error));
             }
         }
+        home_time.set_text(
+            &glib::DateTime::now_local()
+                .and_then(|t| t.format("%I:%M:%S %p"))
+                .map(|s| s.to_string())
+                .unwrap_or_else(|_| "--:--:--".to_string()),
+        );
         clock.set_text(&format!(
             "{}  /  {}",
             glib::DateTime::now_local()
-                .and_then(|t| t.format("%H:%M:%S"))
+                .and_then(|t| t.format("%I:%M:%S %p"))
                 .map(|s| s.to_string())
                 .unwrap_or_default(),
             if last_update.elapsed().as_secs() > 20 {
@@ -795,6 +990,28 @@ fn settings_page(prefs: &Rc<RefCell<Preferences>>) -> gtk::Box {
     p.append(&motion);
     p.append(&label("Touch a system to zoom in; touch its title again to return home. Arrange offers Basic swaps and Advanced move/resize. F11 toggles fullscreen; Escape dismisses Start first. Exit returns to Fedora.", "strip"));
     p.append(&result);
+    p.append(&label("SYSTEM SETTINGS", "eyebrow"));
+    p.append(&label(
+        "Open Fedora's system settings in a native desktop window.",
+        "muted",
+    ));
+    let system_settings = button("OPEN FEDORA SYSTEM SETTINGS", "secondary");
+    p.append(&system_settings);
+    let system_settings_status = label("", "muted");
+    p.append(&system_settings_status);
+    system_settings.connect_clicked(move |_| {
+        match std::process::Command::new("gnome-control-center").spawn() {
+            Ok(mut child) => {
+                std::thread::spawn(move || {
+                    let _ = child.wait();
+                });
+                system_settings_status.set_text("Fedora System Settings opened in a native window.");
+            }
+            Err(e) => system_settings_status.set_text(&format!(
+                "Could not open Fedora System Settings: {e}"
+            )),
+        }
+    });
     p.append(&label("STATION CONFIGURATION", "eyebrow"));
     p.append(&label("Layout, motion and alert preferences are stored on this station. Use Exit in the top rail to return to Fedora.", "muted"));
     p
@@ -974,6 +1191,7 @@ struct FileItem {
     path: PathBuf,
     name: String,
     directory: bool,
+    #[allow(dead_code)] // Retained for a future file-details view.
     details: String,
     size: u64,
 }
@@ -1131,6 +1349,7 @@ fn load_directory(
     });
 }
 
+#[allow(dead_code)] // Reserved for the optional media-preview panel.
 type PreviewUpdate = Rc<dyn Fn(Option<PathBuf>)>;
 fn net_cell(text: &str, class: &str, width: i32) -> gtk::Label {
     let l = label(text, class);
@@ -1208,6 +1427,7 @@ fn render_network_findings(
         into.append(&sec);
     }
 }
+#[allow(dead_code)] // Retained for the optional media-preview panel.
 fn media_preview(window: &gtk::ApplicationWindow, demand: TaskDemand) -> (gtk::Box, PreviewUpdate) {
     let panel = column(8);
     panel.add_css_class("preview-panel");
@@ -1424,20 +1644,39 @@ fn media_preview(window: &gtk::ApplicationWindow, demand: TaskDemand) -> (gtk::B
 }
 
 fn files_page(
-    window: &gtk::ApplicationWindow,
+    _window: &gtk::ApplicationWindow,
     data: &Rc<RefCell<console::InstrumentData>>,
 ) -> gtk::Box {
     let p = page(
         "FILE ACCESS",
         "Browse Fedora files • Linux paths are shown explicitly",
     );
+    p.add_css_class("modern-files-page");
+
+    // Modern LCARS file-browser introduction; all existing navigation and
+    // directory operations remain below this visual header.
+    let intro = column(3);
+    intro.add_css_class("files-hero");
+    intro.append(&label("LCARS / DATA MANAGEMENT", "files-eyebrow"));
+    let hero_title = label("FILE EXPLORER", "files-hero-title");
+    hero_title.set_xalign(0.0);
+    intro.append(&hero_title);
+    let hero_subtitle = label("Browse, locate and open files across this system.", "files-hero-subtitle");
+    hero_subtitle.set_xalign(0.0);
+    intro.append(&hero_subtitle);
+    p.append(&intro);
+
     let controls = row(10);
+    controls.add_css_class("files-toolbar");
+    let back = button("←", "secondary");
+    back.set_tooltip_text(Some("Back to the previous folder"));
     let home = button("HOME", "secondary");
     let up = button("UP", "secondary");
     let path = gtk::Entry::new();
     path.set_hexpand(true);
     path.set_text(&services::home().to_string_lossy());
     let go = button("GO / REFRESH", "primary");
+    controls.append(&back);
     controls.append(&home);
     controls.append(&up);
     controls.append(&path);
@@ -1446,70 +1685,47 @@ fn files_page(
     adaptive_row(&controls, p.upcast_ref(), 660);
     let volumes = gio::VolumeMonitor::get();
     let drives = row(8);
-    let root = button("C:  SYSTEM /", "secondary");
+    drives.add_css_class("files-shortcuts");
+    let root = button("SYSTEM /", "secondary");
     drives.append(&root);
     p.append(&drives);
     let mounted = row(8);
+    mounted.add_css_class("files-mounted-volumes");
     p.append(&mounted);
     adaptive_row(&mounted, p.upcast_ref(), 640);
     let status = label("", "muted");
+    status.add_css_class("files-status-line");
     p.append(&status);
-    let content = row(16);
+    let content = column(10);
+    content.add_css_class("files-list-card");
     content.set_vexpand(true);
     let list = gtk::ListBox::new();
     list.add_css_class("directory");
     list.set_selection_mode(gtk::SelectionMode::Single);
     let list_scroll = scrolled(&list);
+    list_scroll.set_vexpand(true);
+    list_scroll.set_hexpand(true);
+    list_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
     data.borrow_mut().sources.files_path = Some(path.clone());
     data.borrow_mut().sources.files_list = Some(list.clone());
     data.borrow_mut().sources.files_status = Some(status.clone());
     list_scroll.set_min_content_height(250);
-    let file_table = column(0);
-    file_table.set_hexpand(true);
     let headings = row(12);
     headings.add_css_class("file-headings");
+    headings.add_css_class("files-list-heading");
     let name_heading = label("NAME", "table-heading");
     name_heading.set_hexpand(true);
     headings.append(&name_heading);
     let size_heading = label("SIZE / TYPE", "table-heading");
     size_heading.set_width_request(90);
     headings.append(&size_heading);
-    file_table.append(&headings);
-    file_table.append(&list_scroll);
-    content.append(&file_table);
-    let detail = column(12);
-    detail.set_width_request(220);
-    detail.add_css_class("card");
-    let (preview, update_preview) = media_preview(window, data.borrow().demand.clone());
-    detail.append(&preview);
-    detail.append(&label("SELECTION DETAILS", "instrument-title"));
-    let metadata = label("Select a file or folder.", "muted");
-    data.borrow_mut().sources.file_details = Some(metadata.clone());
-    metadata.set_selectable(true);
-    metadata.set_wrap_mode(gtk::pango::WrapMode::WordChar);
-    detail.append(&metadata);
-    let open = button("OPEN", "primary");
-    let trash = button("MOVE TO TRASH", "danger");
-    open.set_sensitive(false);
-    trash.set_sensitive(false);
-    // 04d: inspection scrolls when the viewport is short, but the destructive and
-    // primary actions stay pinned in view instead of falling below the fold.
-    let detail_scroll = gtk::ScrolledWindow::new();
-    detail_scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Automatic);
-    detail_scroll.set_vexpand(true);
-    detail_scroll.set_child(Some(&detail));
-    let detail_column = column(12);
-    detail_column.set_width_request(220);
-    detail_column.set_hexpand(false);
-    detail_column.append(&detail_scroll);
-    detail_column.append(&open);
-    detail_column.append(&trash);
-    content.append(&detail_column);
+    content.append(&headings);
+    content.append(&list_scroll);
     p.append(&content);
-    adaptive_row(&content, p.upcast_ref(), 700);
     let entries: Rc<RefCell<Vec<FileItem>>> = Rc::new(RefCell::new(Vec::new()));
     let filter = gtk::SearchEntry::new();
-    filter.set_placeholder_text(Some("FILTER CURRENT DIRECTORY"));
+    filter.add_css_class("files-search");
+    filter.set_placeholder_text(Some("Search this folder…"));
     let list_copy = list.clone();
     let es_filter = entries.clone();
     filter.connect_search_changed(move |search| {
@@ -1522,20 +1738,20 @@ fn files_page(
     });
     p.insert_child_after(&filter, Some(&controls));
     let generation = Rc::new(Cell::new(0u64));
+    let history: Rc<RefCell<Vec<PathBuf>>> = Rc::new(RefCell::new(Vec::new()));
     let navigate: Rc<dyn Fn(PathBuf)> = {
+        let history = history.clone();
         let list = list.clone();
         let entries = entries.clone();
         let status = status.clone();
         let path = path.clone();
-        let metadata = metadata.clone();
-        let open = open.clone();
-        let trash = trash.clone();
         Rc::new(move |target| {
+            let current = PathBuf::from(path.text().as_str());
+            if current != target {
+                history.borrow_mut().push(current);
+            }
             filter.set_text("");
             path.set_text(&target.to_string_lossy());
-            metadata.set_text("Select a file or folder.");
-            open.set_sensitive(false);
-            trash.set_sensitive(false);
             load_directory(
                 target,
                 list.clone(),
@@ -1611,109 +1827,38 @@ fn files_page(
     go.connect_clicked(move |_| n(PathBuf::from(pa.text().as_str())));
     let n = navigate.clone();
     path.connect_activate(move |p| n(PathBuf::from(p.text().as_str())));
-    let es = entries.clone();
-    let o = open.clone();
-    let t = trash.clone();
-    list.connect_row_selected(move |_, r| {
-        update_preview(None);
-        if let Some(item) = r.and_then(|r| es.borrow().get(r.index() as usize).cloned()) {
-            metadata.set_text(&item.details);
-            if !item.directory {
-                update_preview(Some(item.path.clone()));
-            }
-            o.set_sensitive(true);
-            t.set_sensitive(true);
-        } else {
-            o.set_sensitive(false);
-            t.set_sensitive(false);
-        }
-    });
-    let open_selected: Rc<dyn Fn()> = {
-        let entries = entries.clone();
-        let list = list.clone();
-        let n = navigate.clone();
-        let status = status.clone();
-        Rc::new(move || {
-            if let Some(item) = list
-                .selected_row()
-                .and_then(|r| entries.borrow().get(r.index() as usize).cloned())
-            {
-                if item.directory {
-                    n(item.path);
-                } else {
-                    let uri = gio::File::for_path(&item.path).uri();
-                    if let Err(e) =
-                        gio::AppInfo::launch_default_for_uri(&uri, None::<&gio::AppLaunchContext>)
-                    {
-                        status.set_text(&format!("Open failed: {e}"));
-                    }
-                }
-            }
-        })
-    };
-    let action = open_selected.clone();
-    open.connect_clicked(move |_| action());
-    // Single touch opens folders; files stay selected for preview. OPEN launches a file.
+    // Activating a folder navigates into it; activating a file opens its default application.
     list.set_activate_on_single_click(true);
     let directory_entries = entries.clone();
     let directory_navigate = navigate.clone();
+    let activation_status = status.clone();
     list.connect_row_activated(move |_, row| {
         let item = directory_entries
             .borrow()
             .get(row.index() as usize)
             .cloned();
-        if let Some(item) = item.filter(|item| item.directory) {
-            directory_navigate(item.path);
+        if let Some(item) = item {
+            if item.directory {
+                directory_navigate(item.path);
+            } else {
+                let uri = gio::File::for_path(&item.path).uri();
+                if let Err(e) =
+                    gio::AppInfo::launch_default_for_uri(&uri, None::<&gio::AppLaunchContext>)
+                {
+                    activation_status.set_text(&format!("Open failed: {e}"));
+                }
+            }
         }
     });
-    let es = entries.clone();
-    let ls = list.clone();
-    let weak = window.downgrade();
-    let st = status.clone();
-    let n = navigate.clone();
-    let pa = path.clone();
-    trash.connect_clicked(move |_| {
-        let Some(item) = ls
-            .selected_row()
-            .and_then(|r| es.borrow().get(r.index() as usize).cloned())
-        else {
-            return;
-        };
-        let Some(w) = weak.upgrade() else { return };
-        let dialog = gtk::MessageDialog::builder()
-            .transient_for(&w)
-            .modal(true)
-            .message_type(gtk::MessageType::Question)
-            .text(format!("Move {} to Trash?", item.name))
-            .secondary_text(format!(
-                "{}\nNo permanent-delete fallback is used.",
-                item.path.display()
-            ))
-            .build();
-        dialog.add_button("Cancel", gtk::ResponseType::Cancel);
-        dialog.add_button("Move to Trash", gtk::ResponseType::Accept);
-        dialog.set_default_response(gtk::ResponseType::Cancel);
-        let st = st.clone();
-        let n = n.clone();
-        let pa = pa.clone();
-        dialog.connect_response(move |d, response| {
-            if response == gtk::ResponseType::Accept {
-                let status = st.clone();
-                let navigate = n.clone();
-                let parent = PathBuf::from(pa.text().as_str());
-                gio::File::for_path(&item.path).trash_async(
-                    glib::Priority::DEFAULT,
-                    None::<&gio::Cancellable>,
-                    move |result| match result {
-                        Ok(()) => navigate(parent),
-                        Err(e) => status
-                            .set_text(&format!("Trash failed; nothing permanently deleted: {e}")),
-                    },
-                );
-            }
-            d.close();
-        });
-        dialog.present();
+    let back_history = history.clone();
+    let back_navigate = navigate.clone();
+    back.connect_clicked(move |_| {
+        let previous = back_history.borrow_mut().pop();
+        if let Some(previous) = previous {
+            back_navigate(previous);
+            // Back navigation must not add the folder we just left to history again.
+            back_history.borrow_mut().pop();
+        }
     });
     navigate(services::home());
     p

@@ -6,7 +6,8 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
     mpsc, Arc,
 };
-use std::time::Duration;
+use std::time::{Duration, Instant};
+use std::{cell::RefCell, rc::Rc};
 
 fn label(s: &str) -> gtk::Label {
     let l = gtk::Label::new(Some(s));
@@ -99,6 +100,7 @@ fn render_findings(
 }
 pub fn speed_panel(demand: crate::ui::TaskDemand) -> (gtk::Box, gtk::Label) {
     let p = gtk::Box::new(gtk::Orientation::Vertical, 10);
+    p.add_css_class("modern-panel");
     p.add_css_class("card");
     p.append(&label("SUBSPACE TRANSFER / SPEED TEST"));
     p.append(&label("Cloudflare HTTPS endpoint • downloads 10 MB + uploads 2 MB of generated data. Your IP is visible to Cloudflare. No user files are sent. Single-connection sample; latency includes TLS/HTTP setup."));
@@ -163,8 +165,149 @@ pub fn speed_panel(demand: crate::ui::TaskDemand) -> (gtk::Box, gtk::Label) {
     (p, summary)
 }
 
+fn stopwatch_panel() -> gtk::Box {
+    let panel = section("CHRONOMETER / STOPWATCH");
+    let display = label("00:00:00.00");
+    display.add_css_class("metric");
+    panel.append(&display);
+
+    let controls = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let start_pause = button("START");
+    let reset = button("RESET");
+    controls.append(&start_pause);
+    controls.append(&reset);
+    panel.append(&controls);
+
+    // Accumulated time is retained across pauses; the timer only updates the display.
+    let state = Rc::new(RefCell::new((Duration::ZERO, None::<Instant>)));
+    let timer_state = state.clone();
+    let timer_display = display.clone();
+    glib::timeout_add_local(Duration::from_millis(40), move || {
+        let state = timer_state.borrow();
+        let elapsed = state.0 + state.1.map(|started| started.elapsed()).unwrap_or_default();
+        let centis = elapsed.as_millis() / 10;
+        let hours = centis / 360_000;
+        let minutes = (centis / 6_000) % 60;
+        let seconds = (centis / 100) % 60;
+        let hundredths = centis % 100;
+        timer_display.set_text(&format!("{hours:02}:{minutes:02}:{seconds:02}.{hundredths:02}"));
+        glib::ControlFlow::Continue
+    });
+
+    let button_state = state.clone();
+    let button_label = start_pause.clone();
+    start_pause.connect_clicked(move |_| {
+        let mut state = button_state.borrow_mut();
+        if let Some(started) = state.1.take() {
+            state.0 += started.elapsed();
+            button_label.set_label("RESUME");
+        } else {
+            state.1 = Some(Instant::now());
+            button_label.set_label("PAUSE");
+        }
+    });
+    let reset_state = state.clone();
+    let reset_button = start_pause.clone();
+    reset.connect_clicked(move |_| {
+        *reset_state.borrow_mut() = (Duration::ZERO, None);
+        reset_button.set_label("START");
+    });
+    panel
+}
+
+fn terminal_panel() -> gtk::Box {
+    let panel = section("LOCAL TERMINAL / READ-ONLY COMMANDS");
+    panel.append(&label("Run a limited set of safe system-inspection commands. Commands are launched directly; shell scripts and modifying commands are not supported."));
+    let controls = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    let input = gtk::Entry::new();
+    input.set_hexpand(true);
+    input.set_placeholder_text(Some("help, pwd, ls, uname, uptime, df -h, free -h, ip addr, ..."));
+    let run = button("RUN");
+    controls.append(&input);
+    controls.append(&run);
+    panel.append(&controls);
+
+    let output = gtk::TextView::new();
+    output.set_editable(false);
+    output.set_cursor_visible(false);
+    output.set_monospace(true);
+    output.set_wrap_mode(gtk::WrapMode::WordChar);
+    output.buffer().set_text("LCARS LOCAL TERMINAL READY\nType 'help' for available commands.\n");
+    let scroll = gtk::ScrolledWindow::builder()
+        .min_content_height(150)
+        .max_content_height(240)
+        .child(&output)
+        .build();
+    panel.append(&scroll);
+
+    let execute: Rc<dyn Fn()> = {
+        let input = input.clone();
+        let output = output.clone();
+        Rc::new(move || {
+            let raw = input.text().to_string();
+            let command_line = raw.trim();
+            if command_line.is_empty() { return; }
+            let buffer = output.buffer();
+            let mut end = buffer.end_iter();
+            buffer.insert(&mut end, &format!("\n> {command_line}\n"));
+            if command_line == "clear" {
+                buffer.set_text("LCARS LOCAL TERMINAL READY\n");
+                input.set_text("");
+                return;
+            }
+            if command_line == "help" {
+                let help = "Available: pwd | ls [path] | whoami | hostname | date | uptime | uname [-a] | df [-h] | free [-h] | ip addr | ip route | ps\nOnly read-only inspection commands are enabled. No shell, scripts, sudo, or system changes.\n";
+                let mut end = buffer.end_iter();
+                buffer.insert(&mut end, help);
+                input.set_text("");
+                return;
+            }
+            let parts: Vec<&str> = command_line.split_whitespace().collect();
+            let allowed = matches!(parts.as_slice(),
+                ["pwd"] | ["whoami"] | ["hostname"] | ["date"] | ["uptime"] |
+                ["ls"] | ["ls", _] | ["uname"] | ["uname", "-a"] |
+                ["df"] | ["df", "-h"] | ["free"] | ["free", "-h"] |
+                ["ip", "addr"] | ["ip", "route"] | ["ps"]
+            );
+            if !allowed {
+                let mut end = buffer.end_iter();
+                buffer.insert(&mut end, "COMMAND BLOCKED / not in the read-only allowlist. Type 'help'.\n");
+                input.set_text("");
+                return;
+            }
+            let program = parts[0].to_string();
+            let args: Vec<String> = parts.iter().skip(1).map(|s| (*s).to_string()).collect();
+            let (tx, rx) = mpsc::channel();
+            std::thread::spawn(move || {
+                let arg_refs: Vec<&str> = args.iter().map(String::as_str).collect();
+                let result = crate::services::command(&program, &arg_refs)
+                    .unwrap_or_else(|e| format!("COMMAND FAILED / {e}"));
+                let _ = tx.send(result);
+            });
+            let output_view = output.clone();
+            let input_entry = input.clone();
+            glib::timeout_add_local(Duration::from_millis(60), move || match rx.try_recv() {
+                Ok(result) => {
+                    let buffer = output_view.buffer();
+                    let mut end = buffer.end_iter();
+                    buffer.insert(&mut end, &format!("{result}\n"));
+                    input_entry.set_text("");
+                    glib::ControlFlow::Break
+                }
+                Err(mpsc::TryRecvError::Empty) => glib::ControlFlow::Continue,
+                Err(mpsc::TryRecvError::Disconnected) => glib::ControlFlow::Break,
+            });
+        })
+    };
+    let run_execute = execute.clone();
+    run.connect_clicked(move |_| run_execute());
+    input.connect_activate(move |_| execute());
+    panel
+}
+
 pub fn page(demand: crate::ui::TaskDemand) -> (gtk::Box, gtk::Label, gtk::TextBuffer) {
     let p = gtk::Box::new(gtk::Orientation::Vertical, 14);
+    p.add_css_class("modern-section-page");
     p.set_margin_start(24);
     p.set_margin_end(24);
     p.set_margin_top(20);
@@ -210,6 +353,8 @@ pub fn page(demand: crate::ui::TaskDemand) -> (gtk::Box, gtk::Label, gtk::TextBu
     }
     calc.append(&ops);
     p.append(&calc);
+    p.append(&stopwatch_panel());
+    p.append(&terminal_panel());
     let refresh = button("SCAN SYSTEM / PROCESS DIAGNOSTICS");
     p.append(&refresh);
     let idle = "Read-only scan: kernel, storage, and top processes. No process is terminated.";

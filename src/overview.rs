@@ -12,6 +12,7 @@ pub(in crate::ui) struct Sources {
     pub files_path: Option<gtk::Entry>,
     pub files_list: Option<gtk::ListBox>,
     pub files_status: Option<gtk::Label>,
+    #[allow(dead_code)] // Reserved for optional file-details presentation.
     pub file_details: Option<gtk::Label>,
     pub apps_list: Option<gtk::ListBox>,
     pub apps_status: Option<gtk::Label>,
