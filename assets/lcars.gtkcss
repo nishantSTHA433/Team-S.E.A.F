@@ -1,0 +1,281 @@
+/* Mixed provenance: Codex consolidated CSS foundation; Claude AI continuation
+ * (user-attributed) refined reference colours, elbows, accents and focus styling.
+ * See docs/WORK_PROVENANCE.md. */
+/* LCARS visual system: one palette, native-size type, open-sided instrument rails. */
+
+* { font-family:"Nimbus Sans Narrow", "DejaVu Sans Condensed", sans-serif; font-size:16px; }
+window, dialog, headerbar { background:@lcars_void; color:@lcars_amber; }
+headerbar { border:0; box-shadow:none; }
+button { background:@lcars_lilac; color:@lcars_void; border:0; border-radius:0; min-height:28px; padding:5px 12px; font-weight:700; box-shadow:none; }
+button:hover { background:@lcars_press; }
+button:active { background:@lcars_amber; }
+button:focus-visible, entry:focus, searchentry:focus-within { outline:2px solid @lcars_amber; outline-offset:1px; }
+button:disabled { opacity:0.42; }
+.primary { background:@lcars_amber; }
+.secondary { background:@lcars_lilac; }
+.danger { background:@lcars_coral; }
+.compact { min-height:24px; padding:4px 12px; background:@lcars_coral; font-size:14px; }
+
+/* Thin identity band retains its original height and rightmost Exit. */
+.masthead { background:@lcars_void; border:0; min-height:32px; padding:2px 8px; }
+.brand { color:@lcars_amber; font-size:26px; font-weight:800; margin-right:4px; }
+.masthead-sub { background:@lcars_rose; color:@lcars_void; min-height:14px; padding:0; margin:6px 0; }
+.header-cap { background:@lcars_amber; border-radius:24px 0 0 24px; margin:5px 0; }
+.header-exit { min-height:24px; padding:0 12px; margin:0; background:@lcars_coral; border-radius:0 14px 14px 0; font-size:14px; }
+
+/* Spatial window chrome: a thin title rail inside a full touch target. */
+.console-surface { background:@lcars_void; padding:3px 5px; }
+.console-region { background:@lcars_void; border:0; border-left:10px solid @lcars_coral; border-top-left-radius:12px; }
+.system-band, .system-band:hover, .system-band:active { background:transparent; border:0; border-radius:0; padding:0; }
+.console-band-title { background:@lcars_coral; color:@lcars_void; min-height:30px; padding:0 10px; border-left:0; border-radius:0; font-size:16px; font-weight:700; }
+.system-band:hover .console-band-title { background:@lcars_press; }
+.window-maximize, .window-minimize, .window-maximize:hover, .window-minimize:hover { background:transparent; border:0; padding:0; min-width:44px; min-height:44px; }
+.window-glyph { color:@lcars_void; min-height:30px; font-size:15px; font-weight:800; }
+.window-maximize .window-glyph { background:@lcars_lilac; }
+.window-minimize .window-glyph { background:@lcars_amber; border-radius:0 15px 15px 0; }
+.window-maximize:hover .window-glyph, .window-minimize:hover .window-glyph { background:@lcars_press; }
+.zoom-target, .zoom-target:hover, .zoom-target:active { background:transparent; border:0; padding:0; box-shadow:none; }
+.resize-handle { background:@lcars_amber; font-size:24px; border-radius:20px 0 0 0; }
+.arrange-selected { border-left-color:@lcars_amber; }
+.arrange-selected .console-band-title { background:@lcars_amber; }
+.arrange-mode { background:@lcars_amber; color:@lcars_void; border-radius:0; }
+.console-region scrolledwindow:disabled, .console-region scrolledwindow:disabled * { opacity:1; }
+
+/* Segmented bars and open instrument frames use the same colors as home. */
+.page-title { background:@lcars_coral; color:@lcars_void; border-left:8px solid @lcars_lilac; border-radius:12px 0 0 0; font-size:18px; font-weight:700; padding:3px 9px; }
+.title-segment-coral { background:@lcars_coral; }
+.title-segment-lilac { background:@lcars_lilac; }
+.title-segment-amber { background:@lcars_amber; border-radius:0 14px 14px 0; }
+.card { background:@lcars_void; border:0; border-left:12px solid @lcars_lilac; border-top:12px solid @lcars_lilac; border-radius:30px 0 0 0; padding:10px 10px 10px 14px; }
+.instrument-title { background:@lcars_coral; color:@lcars_void; padding:3px 9px; font-size:16px; font-weight:700; }
+.telemetry-panel { border-right:0; border-bottom:0; border-left:10px solid @lcars_lilac; border-top:10px solid @lcars_lilac; border-top-left-radius:26px; padding:0 0 8px 6px; }
+.telemetry-panel .metric, .telemetry-panel progressbar { margin:0 12px; }
+.history-panel { background:@lcars_void; border:0; border-left:10px solid @lcars_coral; border-top:10px solid @lcars_coral; border-radius:26px 0 0 0; }
+.metric { color:@lcars_amber; font-size:30px; font-weight:800; }
+.hero { color:@lcars_lilac; font-size:36px; font-weight:800; }
+.eyebrow { color:@lcars_coral; font-size:16px; font-weight:700; }
+.muted { color:@lcars_muted; font-size:14px; }
+.graph-scale { color:@lcars_rose; font-size:13px; margin:0 8px 6px; }
+.strip { background:@lcars_void; border-left:8px solid @lcars_coral; color:@lcars_muted; padding:8px 10px; font-size:15px; }
+.preview-panel { border-bottom:2px solid @lcars_rose; padding-bottom:10px; }
+progressbar trough { min-width:0; min-height:9px; background:@lcars_void; border:1px solid @lcars_coral; border-radius:0; }
+progressbar progress { min-width:0; min-height:9px; background:@lcars_coral; border:0; border-radius:0; padding:0; margin:0; }
+
+/* Data stays readable at native pixels; selected rows use inverse LCARS colors. */
+entry, searchentry { background:@lcars_void; color:@lcars_amber; border:1px solid @lcars_lilac; border-radius:0; min-height:30px; padding:6px 9px; }
+.directory { background:@lcars_void; border-left:3px solid @lcars_lilac; border-radius:0; }
+.directory row { border-bottom:1px solid @lcars_rule; }
+.directory row:selected { background:@lcars_lilac; color:@lcars_void; }
+.directory row:selected .file-row, .directory row:selected .muted { color:@lcars_void; }
+.file-row { color:@lcars_amber; padding:6px 8px; font-size:16px; }
+.file-headings { background:@lcars_lilac; padding:3px 8px; border-bottom:3px solid @lcars_void; }
+.table-heading { color:@lcars_void; font-size:16px; font-weight:700; }
+.app-tile { background:@lcars_void; color:@lcars_amber; border-bottom:2px solid @lcars_coral; border-left:7px solid @lcars_coral; padding:10px 10px 10px 14px; }
+.app-tile:hover { background:@lcars_lilac; color:@lcars_void; }
+textview, textview text { background:@lcars_void; color:@lcars_muted; font-family:monospace; font-size:13px; }
+checkbutton { color:@lcars_muted; padding:8px; }
+checkbutton check { background:@lcars_void; color:@lcars_void; border:2px solid @lcars_lilac; border-radius:0; min-width:22px; min-height:22px; }
+checkbutton check:checked { background:@lcars_amber; border-color:@lcars_amber; }
+scrollbar slider { background:@lcars_lilac; border-radius:0; min-width:6px; min-height:24px; }
+scrollbar trough { background:@lcars_void; }
+
+/* Bottom access rail and matching popovers. */
+.footer { background:@lcars_void; border-top:4px solid @lcars_rose; padding:5px 8px; }
+.console-clock { color:@lcars_amber; font-size:20px; font-weight:800; }
+.status { color:@lcars_amber; font-size:14px; font-weight:700; }
+.warning { color:@lcars_alert; }
+.alert-banner { background:@lcars_amber; color:@lcars_void; padding:8px 12px; font-weight:800; }
+.dock-button { background:@lcars_lilac; color:@lcars_void; border-top:3px solid @lcars_rose; padding:3px 12px; font-size:16px; }
+.dock-button:first-child { background:@lcars_amber; border-radius:18px 0 0 18px; }
+.dock-button:nth-child(3) { background:@lcars_coral; }
+.dock-button:nth-child(4) { background:@lcars_rose; }
+.start-button > button { background:@lcars_amber; color:@lcars_void; border-radius:26px 0 0 26px; padding:6px 15px; font-size:18px; font-weight:700; }
+popover > contents { background:@lcars_void; color:@lcars_amber; border:2px solid @lcars_lilac; border-radius:12px 0 12px 0; padding:8px; }
+.lcars-start-menu > contents { border-left:12px solid @lcars_coral; border-radius:26px 0 0 0; padding:12px; }
+.start-app { background:@lcars_void; color:@lcars_amber; border-bottom:1px solid @lcars_rule; padding:6px 10px; font-size:16px; }
+.start-app:hover { background:@lcars_lilac; color:@lcars_void; }
+.start-system { background:@lcars_lilac; font-size:18px; }
+.start-system:nth-child(3), .start-system:nth-child(6) { background:@lcars_coral; }
+.arrange-mode popover row { min-height:44px; color:@lcars_amber; background:@lcars_void; }
+.arrange-mode popover row:selected { background:@lcars_lilac; color:@lcars_void; }
+
+
+/* LCARS navigation rail: strong contrast and consistent button colors. */
+.lcars-elbow-sidebar { background:@lcars_void; border-left:12px solid @lcars_coral; border-top:12px solid @lcars_coral; border-top-left-radius:28px; padding:8px; }
+.lcars-elbow-header { background:@lcars_coral; padding:5px 8px; }
+.sidebar-nav-button, .sidebar-nav-button:focus { background:@lcars_lilac; color:@lcars_void; border:0; border-left:0; border-radius:0 18px 0 0; min-height:48px; padding:7px 12px; font-weight:800; }
+.sidebar-nav-button:hover { background:#FFD166; color:@lcars_void; border-left-color:@lcars_rose; }
+.sidebar-nav-button:active { background:@lcars_coral; color:@lcars_void; }
+.lcars-elbow-item { margin:2px 0; }
+/* Individual solid LCARS colors for the permanent left navigation. */
+.history-panel button.sidebar-nav-button:nth-child(2) { background-color:#ff9900; }
+.history-panel button.sidebar-nav-button:nth-child(3) { background-color:#cd6667; }
+.history-panel button.sidebar-nav-button:nth-child(4) { background-color:#b56e94; }
+.history-panel button.sidebar-nav-button:nth-child(5) { background-color:#9c99ff; }
+.history-panel button.sidebar-nav-button:nth-child(6) { background-color:#C17A42; color:#080808; } /* TOOLS: copper, distinct from yellow hover */
+.history-panel button.sidebar-nav-button:nth-child(7) { background-color:#cb99ce; }
+.history-panel button.sidebar-nav-button:nth-child(8) { background-color:#cd6667; }
+.history-panel button.sidebar-nav-button:hover { background-color:#FFD166; color:#080808; }
+.history-panel button.sidebar-nav-button:active { background-color:#168C9C; color:#080808; }
+.history-panel button.sidebar-nav-button.current-section { background-color:#168C9C; }
+
+/* LCARS active tab: a lit vertical marker and arrow follow the visible section. */
+.sidebar-nav-content { min-height:38px; }
+.sidebar-active-marker {
+    background:transparent;
+    border-radius:8px 0 0 8px;
+    min-width:9px;
+}
+.sidebar-nav-label { color:@lcars_void; font-weight:800; }
+.sidebar-active-arrow {
+    color:@lcars_void;
+    font-size:28px;
+    font-weight:900;
+    min-width:18px;
+}
+.sidebar-nav-button.current-section {
+    background:#168C9C;
+    box-shadow:none;
+}
+.sidebar-nav-button.current-section .sidebar-active-marker {
+    background:@lcars_amber;
+    min-width:10px;
+}
+.sidebar-nav-button.current-section .sidebar-nav-label,
+.sidebar-nav-button.current-section .sidebar-active-arrow {
+    color:@lcars_void;
+}
+.sidebar-nav-button:active { background:#168C9C; }
+
+/* Files: selection is unmistakable; action rail has distinct LCARS colors. */
+.directory row:selected { background:@lcars_amber; color:@lcars_void; outline:2px solid @lcars_coral; outline-offset:-2px; }
+.directory row:selected .file-row, .directory row:selected .muted { color:@lcars_void; font-weight:800; }
+.files-action-menu { background:@lcars_void; border-left:8px solid @lcars_coral; border-top:8px solid @lcars_coral; padding:8px; min-width:142px; }
+.files-action-menu button.primary { background:@lcars_amber; color:@lcars_void; }
+.files-action-menu button.secondary { background:@lcars_lilac; color:@lcars_void; }
+.files-action-menu button:hover { background:@lcars_coral; color:@lcars_void; }
+.files-action-menu button:disabled { background:@lcars_rule; color:@lcars_muted; opacity:1; }
+
+/* Applications page: match the dark navy FILES workspace without changing
+   application discovery, filtering, or launch behavior. */
+.modern-apps-page {
+    background: #0B1020;
+    color: #E4E9F5;
+}
+.modern-apps-page .muted,
+.modern-apps-page .apps-status {
+    color: #9AA8C7;
+    font-family: "Nimbus Sans Narrow", "DejaVu Sans Condensed", sans-serif;
+}
+.modern-apps-page searchentry.apps-search,
+.modern-apps-page entry.apps-search {
+    background: #151F33;
+    color: #E4E9F5;
+    border: 1px solid #35445F;
+    border-radius: 10px;
+    padding: 8px 12px;
+}
+.modern-apps-page .apps-directory {
+    background: #111A2D;
+    color: #E4E9F5;
+    border-left: 3px solid @lcars_lilac;
+    border-radius: 10px;
+}
+.modern-apps-page .apps-directory row {
+    background: transparent;
+    border-bottom: 1px solid #35445F;
+}
+.modern-apps-page .apps-directory row:last-child {
+    border-bottom: 0;
+}
+.modern-apps-page .apps-directory .app-tile {
+    background: transparent;
+    color: @lcars_amber;
+    border: 0;
+    border-bottom: 1px solid #35445F;
+    border-radius: 0;
+    padding: 12px 14px;
+    font-family: "Nimbus Sans Narrow", "DejaVu Sans Condensed", sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+}
+.modern-apps-page .apps-directory .app-tile:hover {
+    background: @lcars_press;
+    color: @lcars_void;
+}
+.modern-apps-page .apps-launch-bar {
+    color: #9AA8C7;
+}
+
+
+/* Final navigation color overrides: each button has its own default color.
+   Hover yellow is reserved for hover only; active section always stays teal. */
+.history-panel button.sidebar-nav-button:nth-child(2) { background-color: #FF9900; color: #080808; } /* HOME */
+.history-panel button.sidebar-nav-button:nth-child(3) { background-color: #CD6667; color: #080808; } /* FILES */
+.history-panel button.sidebar-nav-button:nth-child(4) { background-color: #B56E94; color: #080808; } /* NETWORK */
+.history-panel button.sidebar-nav-button:nth-child(5) { background-color: #9C99FF; color: #080808; } /* APPS */
+.history-panel button.sidebar-nav-button:nth-child(6) { background-color: #C17A42; color: #080808; } /* TOOLS: copper */
+.history-panel button.sidebar-nav-button:nth-child(7) { background-color: #CB99CE; color: #080808; } /* SETTINGS */
+.history-panel button.sidebar-nav-button:nth-child(8) { background-color: #6FB7C8; color: #080808; } /* FULLSCREEN */
+
+/* Hover color is shared, but never used as a button's default color. */
+.history-panel button.sidebar-nav-button:hover:not(.current-section) {
+    background-color: #FFD166;
+    color: #080808;
+}
+
+/* The selected section wins over normal, hover, focus, and pressed states. */
+.history-panel button.sidebar-nav-button.current-section,
+.history-panel button.sidebar-nav-button.current-section:hover,
+.history-panel button.sidebar-nav-button.current-section:focus,
+.history-panel button.sidebar-nav-button.current-section:active {
+    background-color: #168C9C;
+    background-image: none;
+    color: #080808;
+    box-shadow: none;
+}
+.history-panel button.sidebar-nav-button.current-section .sidebar-nav-label,
+.history-panel button.sidebar-nav-button.current-section .sidebar-active-arrow {
+    color: #080808;
+}
+.history-panel button.sidebar-nav-button.current-section .sidebar-active-marker {
+    background-color: #FFD166;
+}
+
+
+/* NETWORK and TOOLS share the FILES workspace surface and typography.
+   Their existing controls and button colors are intentionally unchanged. */
+.modern-files-page {
+    background: #0B1020;
+    color: #E4E9F5;
+    font-family: "Nimbus Sans Narrow", "DejaVu Sans Condensed", sans-serif;
+    font-size: 16px;
+}
+.modern-files-page * {
+    font-family: "Nimbus Sans Narrow", "DejaVu Sans Condensed", sans-serif;
+}
+.modern-files-page .muted {
+    color: #9AA8C7;
+}
+.modern-files-page .card {
+    background: #111A2D;
+    color: #E4E9F5;
+    border-color: #35445F;
+}
+.modern-files-page entry,
+.modern-files-page searchentry {
+    background: #151F33;
+    color: #E4E9F5;
+    border: 1px solid #35445F;
+}
+.modern-files-page textview,
+.modern-files-page textview text {
+    background: #111A2D;
+    color: #E4E9F5;
+    font-family: "Nimbus Sans Narrow", "DejaVu Sans Condensed", sans-serif;
+    font-size: 16px;
+}
+.modern-files-page scrolledwindow,
+.modern-files-page viewport {
+    background: #0B1020;
+}
