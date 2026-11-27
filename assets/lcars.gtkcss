@@ -279,3 +279,28 @@ popover > contents { background:@lcars_void; color:@lcars_amber; border:2px soli
 .modern-files-page viewport {
     background: #0B1020;
 }
+
+
+/* Optional accessibility modes for the Settings workspace only. */
+.modern-files-page.settings-large-text,
+.modern-files-page.settings-large-text * {
+    font-size: 19px;
+}
+.modern-files-page.settings-large-buttons button,
+.modern-files-page.settings-large-buttons checkbutton,
+.modern-files-page.settings-large-buttons scale {
+    min-height: 58px;
+}
+.modern-files-page.settings-high-contrast {
+    background: #05070D;
+    color: #FFFFFF;
+}
+.modern-files-page.settings-high-contrast .muted {
+    color: #E2E8F0;
+}
+.modern-files-page.settings-high-contrast .strip,
+.modern-files-page.settings-high-contrast .card {
+    background: #000000;
+    color: #FFFFFF;
+    border: 2px solid #FFD166;
+}
